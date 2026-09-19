@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screening Room — Admin</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand-block">
+      <a class="brand" href="/" aria-label="Go home">Screening<span class="dot">·</span>Room</a>
+      <a class="brand-credit" href="/" aria-label="Made by Redinn">made by Redinn</a>
+    </div>
+    <div class="whoami" id="whoami"></div>
+  </div>
+
+  <div class="container" style="padding-top:36px;padding-bottom:80px;">
+    <h1 style="font-size:1.6rem;margin-bottom:6px;">Profiles</h1>
+    <p style="margin-bottom:28px;">Create profiles for the people you're sharing this with, and decide who can host a room.</p>
+
+    <div class="panel">
+      <form class="new-profile-form" id="new-profile-form">
+        <div class="field">
+          <label for="np-name">Display name</label>
+          <input type="text" id="np-name" placeholder="e.g. Sam" maxlength="40" required>
+        </div>
+        <div class="field" style="max-width:140px;">
+          <label for="np-pin">PIN (optional)</label>
+          <input type="text" id="np-pin" placeholder="4–8 digits" maxlength="8">
+        </div>
+        <div class="field" style="flex:0 0 auto;">
+          <label>&nbsp;</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.9rem;color:var(--screen);">
+            <span class="toggle"><input type="checkbox" id="np-canhost"><span class="track"></span></span>
+            Can host rooms
+          </label>
+        </div>
+        <button class="btn-primary" type="submit">Add profile</button>
+      </form>
+      <div class="error-text" id="new-profile-error"></div>
+
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Profile</th>
+            <th>Can host</th>
+            <th>Admin</th>
+            <th>Status</th>
+            <th>PIN</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="profiles-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screening Room — Room</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="stage">
+    <div class="stage-header">
+      <div class="room-title">
+        <div class="brand-block">
+          <a class="brand" href="/" aria-label="Go home" style="font-size:1.05rem;">Screening<span class="dot">·</span>Room</a>
+          <a class="brand-credit" href="/" aria-label="Made by Redinn">made by Redinn</a>
+        </div>
+        <span class="code-chip" id="room-code-chip"></span>
+        <button class="btn-ghost btn-tiny" id="private-toggle-btn" style="display:none;margin-left:8px;" type="button"></button>
+      </div>
+      <div style="display:flex;align-items:center;gap:18px;">
+        <div class="viewer-count"><span class="bulb"></span><span id="viewer-count">1 watching</span></div>
+        <div class="whoami" id="whoami"></div>
+      </div>
+    </div>
+
+    <div class="screen-wrap" id="screen-wrap">
+      <div class="no-video-placeholder" id="no-video">
+        <h3>Nothing queued up yet</h3>
+        <p id="no-video-text">Waiting for the host to upload a video.</p>
+      </div>
+      <video id="player" style="display:none;" playsinline disablePictureInPicture></video>
+    </div>
+
+    <div class="control-strip">
+      <div class="left" id="host-controls" style="display:none;">
+        <label class="upload-label btn-ghost btn-small">
+          <input type="file" id="file-input" accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/x-msvideo,video/ogg,.mp4,.webm,.mov,.mkv,.avi,.ogv,.m4v">
+          <span id="upload-label-text">Upload video</span>
+        </label>
+        <span class="progress-note" id="upload-progress"></span>
+        <button class="btn-ghost btn-small" id="control-panel-toggle" type="button" style="margin-left:12px;">Manage who can control</button>
+      </div>
+      <div class="left" id="viewer-note" style="display:none;">
+        <span class="role-badge viewer">Viewer</span>
+        <span class="progress-note">Playback follows the host</span>
+        <button class="btn-ghost btn-small" id="sync-btn" type="button" style="margin-left:8px;">Re-sync now</button>
+        <label class="upload-label btn-ghost btn-small" id="viewer-upload-label" style="display:none; margin-left:12px;">
+          <input type="file" id="viewer-file-input" accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/x-msvideo,video/ogg,.mp4,.webm,.mov,.mkv,.avi,.ogv,.m4v">
+          <span id="viewer-upload-label-text">Upload video</span>
+        </label>
+        <span class="progress-note" id="viewer-upload-progress" style="display:none; margin-left:8px;"></span>
+        <div class="volume-slider-wrap" style="margin-left:16px; display:flex; align-items:center; gap:8px;">
+          <span class="volume-icon" style="color:var(--mist); font-size:0.8rem;">Vol</span>
+          <input type="range" id="viewer-volume" class="volume-slider" min="0" max="1" step="0.05" value="1" style="width:80px; accent-color:var(--projector);">
+        </div>
+      </div>
+      <div class="center" id="center-controls" style="display:none;">
+      </div>
+      <div class="right">
+        <span class="role-badge" id="role-badge" style="display:none;">Host</span>
+        <button class="btn-danger btn-small" id="end-room-btn" style="display:none;">End screening</button>
+      </div>
+    </div>
+
+    <!-- Host-only control panel: shows room members and lets the host add/remove control access -->
+    <div class="control-panel" id="control-panel" style="display:none;">
+      <div class="control-panel-header">
+        <h3>Who can control</h3>
+        <span class="control-panel-hint">Add viewers to let them play/pause/seek. Upload access is separate — use the upload toggle to grant it.</span>
+      </div>
+      <div class="control-panel-list" id="control-panel-list"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" style="display:none;"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/room.js"></script>
+  <script src="/js/subtitles.js"></script>
+</body>
+</html>

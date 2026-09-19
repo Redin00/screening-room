@@ -1,0 +1,714 @@
+/* ============================================================
+   Screening Room — visual identity
+   A private cinema, not a dashboard: a dim room, one warm light
+   source (the projector beam), and marquee-scaled numerals for
+   the one truly memorable artifact — the room code.
+   ============================================================ */
+
+:root {
+  --ink: #14151c;          /* main background: near-black indigo */
+  --curtain: #221a2b;      /* panel background: deep aubergine */
+  --curtain-raised: #2b2135;
+  --line: rgba(226, 220, 240, 0.1);
+  --projector: #e8a33d;    /* primary accent: warm projector light */
+  --projector-dim: #a8752c;
+  --screen: #f3ede1;       /* warm off-white for high-emphasis text */
+  --ember: #d1495b;        /* destructive / "ending" actions */
+  --mist: #948fa3;         /* secondary text */
+  --mist-faint: #625d72;
+
+  --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  --radius-sm: 3px;
+  --radius-md: 6px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink);
+  color: var(--screen);
+  font-family: var(--sans);
+  min-height: 100vh;
+}
+
+body {
+  background-image:
+    radial-gradient(ellipse 900px 500px at 50% -10%, rgba(232, 163, 61, 0.09), transparent 60%);
+  background-attachment: fixed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+a { color: inherit; }
+
+h1, h2, h3 {
+  font-family: var(--serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+p { color: var(--mist); line-height: 1.5; }
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand-block {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  letter-spacing: -0.02em;
+  color: var(--screen);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  transition: background 0.15s ease;
+  text-decoration: none;
+}
+.brand:hover { background: rgba(243, 237, 225, 0.06); }
+.brand .dot { color: var(--projector); }
+
+.brand-credit {
+  color: var(--mist);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  text-decoration: none;
+  opacity: 0.9;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+.brand-credit:hover { color: var(--screen); opacity: 1; }
+
+.whoami {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: var(--mist);
+}
+.whoami .avatar-sm {
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--serif); font-size: 0.9rem; color: var(--ink); font-weight: 600;
+}
+
+button {
+  font-family: var(--sans);
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 11px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: transform 0.08s ease, opacity 0.15s ease;
+}
+button:active { transform: scale(0.98); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary { background: var(--projector); color: #241704; }
+.btn-primary:hover:not(:disabled) { background: #f0ad4f; }
+
+.btn-ghost { background: transparent; color: var(--screen); border: 1px solid var(--line); }
+.btn-ghost:hover:not(:disabled) { border-color: var(--mist); }
+
+.btn-danger { background: transparent; color: var(--ember); border: 1px solid rgba(209, 73, 91, 0.4); }
+.btn-danger:hover:not(:disabled) { background: rgba(209, 73, 91, 0.12); }
+
+.btn-small { padding: 7px 14px; font-size: 0.85rem; }
+
+input[type="text"], input[type="password"], input[type="tel"] {
+  font-family: var(--sans);
+  background: var(--ink);
+  border: 1px solid var(--line);
+  color: var(--screen);
+  border-radius: var(--radius-md);
+  padding: 11px 14px;
+  font-size: 0.95rem;
+  width: 100%;
+}
+input:focus {
+  outline: 2px solid var(--projector);
+  outline-offset: 1px;
+}
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--mist);
+  margin-bottom: 6px;
+}
+
+.field { margin-bottom: 18px; }
+
+.panel {
+  background: var(--curtain);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 28px;
+}
+
+.error-text {
+  color: var(--ember);
+  font-size: 0.88rem;
+  margin-top: 8px;
+  min-height: 1.2em;
+}
+.hint-text {
+  color: var(--mist-faint);
+  font-size: 0.82rem;
+  margin-top: 8px;
+}
+
+/* ---------- Profile picker ("Who's watching?") ---------- */
+
+.picker-stage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.picker-stage h1 {
+  font-size: 2.1rem;
+  color: var(--screen);
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+.profile-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  justify-content: center;
+  max-width: 720px;
+}
+
+.profile-tile {
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 128px;
+}
+
+.profile-tile .avatar {
+  width: 108px;
+  height: 108px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--serif);
+  font-size: 2.4rem;
+  color: rgba(20, 21, 28, 0.85);
+  border: 2px solid transparent;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+
+.profile-tile:hover .avatar,
+.profile-tile:focus-visible .avatar {
+  border-color: var(--screen);
+  transform: translateY(-2px);
+}
+
+.profile-tile .name {
+  font-size: 0.95rem;
+  color: var(--mist);
+}
+.profile-tile:hover .name { color: var(--screen); }
+
+.profile-tile .lock {
+  font-size: 0.72rem;
+  color: var(--mist-faint);
+}
+
+.add-profile-note {
+  margin-top: 36px;
+  color: var(--mist-faint);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.pin-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(10, 10, 14, 0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.pin-modal {
+  background: var(--curtain-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 32px;
+  width: 320px;
+  text-align: center;
+}
+.pin-modal .avatar { margin: 0 auto 16px; }
+.pin-modal input {
+  text-align: center;
+  letter-spacing: 0.4em;
+  font-size: 1.3rem;
+  font-family: var(--serif);
+}
+.pin-modal .actions { display: flex; gap: 10px; margin-top: 18px; }
+.pin-modal .actions button { flex: 1; }
+
+/* ---------- Lobby ---------- */
+
+.lobby-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 28px;
+  padding: 40px 0 80px;
+}
+@media (max-width: 760px) {
+  .lobby-grid { grid-template-columns: 1fr; }
+}
+
+.lobby-grid h2 {
+  font-size: 1.3rem;
+  color: var(--screen);
+  margin-bottom: 6px;
+}
+.lobby-grid .panel > p.section-sub {
+  margin: 0 0 20px;
+  font-size: 0.88rem;
+}
+
+.room-code-reveal {
+  text-align: center;
+  padding: 30px 0 10px;
+}
+.room-code-reveal .label {
+  font-size: 0.82rem;
+  color: var(--mist);
+  margin-bottom: 10px;
+}
+.room-code-reveal .code {
+  font-family: var(--serif);
+  font-size: 3.4rem;
+  letter-spacing: 0.12em;
+  color: var(--projector);
+  line-height: 1;
+}
+
+.join-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.join-row input { text-transform: uppercase; letter-spacing: 0.08em; }
+
+.room-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.room-list-item {
+  background: var(--curtain);
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.room-list-item .stub {
+  border-left: 2px dashed var(--mist-faint);
+  padding-left: 14px;
+  margin-left: 2px;
+}
+.room-list-item .r-name { color: var(--screen); font-size: 0.98rem; }
+.room-list-item .r-meta { color: var(--mist-faint); font-size: 0.8rem; margin-top: 2px; }
+.room-list-item .r-private-badge {
+  font-size: 0.65rem;
+  color: var(--mist-faint);
+  background: rgba(148, 143, 163, 0.12);
+  border: 1px solid var(--line);
+  padding: 1px 6px;
+  border-radius: 100px;
+  margin-left: 6px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.room-list-empty {
+  padding: 30px 18px;
+  text-align: center;
+  color: var(--mist-faint);
+  background: var(--curtain);
+  border-radius: var(--radius-md);
+}
+
+.perm-note {
+  background: var(--curtain);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  color: var(--mist);
+  font-size: 0.88rem;
+}
+
+/* ---------- Room / player ---------- */
+
+.stage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.stage-header .room-title { display: flex; align-items: baseline; gap: 10px; }
+.stage-header .room-title .code-chip {
+  font-family: var(--serif);
+  color: var(--projector);
+  letter-spacing: 0.1em;
+  font-size: 1rem;
+}
+.viewer-count {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--mist); font-size: 0.85rem;
+}
+.viewer-count .bulb {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--projector);
+  box-shadow: 0 0 8px 1px rgba(232, 163, 61, 0.7);
+}
+
+.screen-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  padding: 20px;
+  min-height: 0;
+}
+.screen-wrap video {
+  max-width: 100%;
+  max-height: 78vh;
+  background: #000;
+  border-radius: 2px;
+}
+
+/* Remove the browser's default dark background box behind captions/subtitles */
+.screen-wrap video::cue {
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--screen);
+  /* Fallback thin black stroke for renderers that honour it (Chrome/Edge);
+     the semi-transparent background is the primary readability aid. */
+  -webkit-text-stroke: 1px #000;
+  text-stroke: 1px #000;
+  /* Push cues a little higher in the frame on browsers that honour
+     vertical-align inside ::cue (webkit). Safe no-op for others. */
+  vertical-align: 12%;
+}
+
+.screen-wrap video:fullscreen {
+  max-width: 100%;
+  max-height: 100vh;
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+  border-radius: 0;
+}
+
+/* Mobile inline expand — avoids the native fullscreen player that would break socket sync */
+@media (max-width: 768px) {
+  .screen-wrap.expanded {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    padding: 0;
+    background: #000;
+  }
+  .screen-wrap.expanded video {
+    max-width: 100vw;
+    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
+    border-radius: 0;
+  }
+  .control-strip.expanded {
+    display: none;
+  }
+}
+
+.no-video-placeholder {
+  text-align: center;
+  color: var(--mist-faint);
+  max-width: 360px;
+}
+.no-video-placeholder h3 { color: var(--mist); margin-bottom: 10px; font-size: 1.1rem; }
+
+.control-strip {
+  padding: 18px 24px 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.control-strip .left, .control-strip .right, .control-strip .center { display: flex; align-items: center; gap: 12px; }
+.upload-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  cursor: pointer;
+}
+.upload-label input[type="file"] { display: none; }
+
+.role-badge {
+  font-size: 0.72rem;
+  color: var(--ink);
+  background: var(--projector);
+  padding: 3px 9px;
+  border-radius: 100px;
+  font-weight: 700;
+}
+.role-badge.viewer {
+  background: transparent;
+  color: var(--mist);
+  border: 1px solid var(--line);
+}
+
+.progress-note {
+  font-size: 0.8rem;
+  color: var(--mist-faint);
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--curtain-raised);
+  border: 1px solid var(--line);
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  color: var(--screen);
+  z-index: 60;
+}
+
+/* ---------- Admin ---------- */
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.admin-table th {
+  text-align: left;
+  font-size: 0.78rem;
+  color: var(--mist-faint);
+  font-weight: 600;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.admin-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+.admin-table tr:last-child td { border-bottom: none; }
+
+.name-cell { display: flex; align-items: center; gap: 10px; }
+.name-cell .avatar-sm { flex-shrink: 0; }
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .track {
+  position: absolute; inset: 0;
+  background: var(--line);
+  border-radius: 100px;
+  transition: background 0.15s ease;
+}
+.toggle .track::before {
+  content: "";
+  position: absolute;
+  width: 16px; height: 16px;
+  left: 3px; top: 3px;
+  background: var(--mist);
+  border-radius: 50%;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.toggle input:checked + .track { background: rgba(232, 163, 61, 0.25); }
+.toggle input:checked + .track::before { transform: translateX(16px); background: var(--projector); }
+
+.status-pill {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 100px;
+  border: 1px solid var(--line);
+  color: var(--mist);
+}
+.status-pill.disabled { color: var(--ember); border-color: rgba(209,73,91,0.4); }
+
+.new-profile-form {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+.new-profile-form .field { margin-bottom: 0; flex: 1; min-width: 160px; }
+
+.section-gap { margin-top: 40px; }
+
+/* ---------- Control panel (who can control) ---------- */
+
+.control-panel {
+  background: var(--curtain);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  margin: 16px 24px 24px;
+  max-width: 520px;
+}
+.control-panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.control-panel-header h3 {
+  font-size: 1rem;
+  color: var(--screen);
+  margin: 0;
+}
+.control-panel-hint {
+  font-size: 0.78rem;
+  color: var(--mist-faint);
+}
+.control-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+}
+.member-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--serif);
+  font-size: 0.9rem;
+  color: rgba(20, 21, 28, 0.85);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.member-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.member-display {
+  font-size: 0.88rem;
+  color: var(--screen);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.member-badge {
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: 100px;
+  font-weight: 600;
+  width: fit-content;
+}
+.member-badge.authorized {
+  background: rgba(90, 166, 107, 0.2);
+  color: #7fc48a;
+  border: 1px solid rgba(90, 166, 107, 0.4);
+}
+.member-badge.viewer {
+  background: transparent;
+  color: var(--mist-faint);
+  border: 1px solid var(--line);
+}
+
+.member-perms {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.member-actions { display: flex; gap: 6px; }
+.btn-tiny {
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  border-radius: var(--radius-sm);
+  color: var(--mist);
+  background: transparent;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  font-family: var(--sans);
+}
+.btn-tiny:hover { border-color: var(--mist); color: var(--screen); }
+
+/* ---------- Empty state for control panel ---------- */
+.empty-room {
+  padding: 20px;
+  text-align: center;
+  color: var(--mist-faint);
+  font-size: 0.88rem;
+}

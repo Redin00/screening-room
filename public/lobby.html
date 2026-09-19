@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screening Room — Lobby</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand-block">
+      <a class="brand" href="/" aria-label="Go home">Screening<span class="dot">·</span>Room</a>
+      <a class="brand-credit" href="/" aria-label="Made by Redinn">made by Redinn</a>
+    </div>
+    <div class="whoami" id="whoami"></div>
+  </div>
+
+  <div class="container">
+    <div class="lobby-grid">
+      <div>
+        <div class="panel" id="host-panel">
+          <h2>Start a screening</h2>
+          <p class="section-sub">Create a room and share the code with your guests.</p>
+          <div id="host-form">
+            <div class="field">
+              <label for="room-name">Room name</label>
+              <input type="text" id="room-name" placeholder="Friday movie night" maxlength="60">
+            </div>
+            <label class="field" style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:18px;">
+              <input type="checkbox" id="room-private" style="width:auto;accent-color:var(--projector);">
+              <span style="font-size:0.92rem;color:var(--mist);">Private room — won't appear in the open list</span>
+            </label>
+            <button class="btn-primary" id="create-room-btn" type="button" style="width:100%;">Create room</button>
+            <div class="error-text" id="create-error"></div>
+          </div>
+          <div id="room-code-reveal" class="room-code-reveal" style="display:none;">
+            <div class="label">Share this code with your guests</div>
+            <div class="code" id="new-room-code"></div>
+            <button class="btn-primary" id="enter-room-btn" type="button" style="margin-top:22px;width:100%;">Enter the room</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <h2>Join a screening</h2>
+          <p class="section-sub">Have a code from a host? Jump straight in.</p>
+          <div class="join-row">
+            <input type="text" id="join-code" placeholder="ROOM CODE" maxlength="8">
+            <button class="btn-primary" id="join-btn" type="button">Join</button>
+          </div>
+          <div class="error-text" id="join-error"></div>
+
+          <div style="margin-top:18px; text-align:center;">
+            <button class="btn-ghost btn-small" id="surprise-btn" type="button">SURPRISE!</button>
+          </div>
+
+          <h2 class="section-gap" style="margin-bottom:14px;">Open rooms</h2>
+          <div class="room-list" id="room-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/lobby.js"></script>
+</body>
+</html>

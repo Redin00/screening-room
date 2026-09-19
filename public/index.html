@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screening Room</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="picker-stage">
+    <h1>Who's watching?</h1>
+    <div class="profile-grid" id="profile-grid"></div>
+    <p class="add-profile-note" id="empty-note" style="display:none;">
+      No profiles yet — ask an administrator to set one up for you.
+    </p>
+  </div>
+
+  <div class="pin-modal-backdrop" id="pin-backdrop" style="display:none;">
+    <div class="pin-modal">
+      <div class="avatar" id="pin-avatar" style="width:72px;height:72px;font-size:1.7rem;"></div>
+      <h3 id="pin-name" style="margin-bottom:6px;color:var(--screen);"></h3>
+      <p style="margin-bottom:16px;font-size:0.85rem;">Enter this profile's PIN</p>
+      <input type="password" inputmode="numeric" id="pin-input" maxlength="8" placeholder="••••" autocomplete="off">
+      <div class="error-text" id="pin-error"></div>
+      <div class="actions">
+        <button class="btn-ghost" id="pin-cancel" type="button">Cancel</button>
+        <button class="btn-primary" id="pin-submit" type="button">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/picker.js"></script>
+</body>
+</html>
