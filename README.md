@@ -29,6 +29,12 @@ Plain Node.js — no build step, no framework lock-in:
 > still marked experimental by Node itself — you'll see one warning line on
 > startup, which is expected and harmless. Check your version with
 > `node --version` before installing.
+>
+> **`ffmpeg` is optional (but recommended):** `.mkv` and `.webm` embedded
+> subtitles (`ASS/SSA`, `SRT`, `WebVTT`) are extracted natively in pure
+> Node.js even without `ffmpeg` installed. Installing `ffmpeg` is
+> recommended if you also want to extract embedded subtitles from `.mp4`,
+> `.mov`, or `.avi` files (see [Subtitles & `ffmpeg`](#subtitles--ffmpeg-optional-but-recommended) below).
 
 ## Getting started
 
@@ -65,6 +71,7 @@ server/index.js    → wires up Express, sessions, Socket.IO, routes
 server/db.js       → SQLite schema + first-run admin bootstrap
 server/routes/     → profiles (login), admin (profile mgmt), rooms
 server/sockets/    → the realtime sync protocol (see below)
+server/subtitles.js→ subtitle probing & WebVTT extraction (ffmpeg + pure-JS MKV fallback)
 server/cleanup/    → the file-deletion scheduler + periodic safety sweep
 server/upload.js   → multer config: extension + MIME allowlist, size limit
 ```
@@ -100,6 +107,31 @@ Socket.IO connection check on every request.
 5. The host clicks **End screening** (`POST /api/rooms/:code/end`), which
    marks the room closed and schedules the video for deletion.
 
+### Subtitles & `ffmpeg` (optional, but recommended)
+
+When a video is uploaded, `server/subtitles.js` automatically probes and
+extracts embedded subtitle tracks to `.vtt` (`WebVTT`) files, preserving
+Crunchyroll-style typography, custom appearance settings (font, size, colors,
+border, bottom margin), and positioning tags (`{\an8}`, `{\pos(x,y)}`).
+
+- **Without `ffmpeg` installed (Pure Node.js fallback):**
+  If `ffmpeg` / `ffprobe` are not installed on the system, Screening Room
+  automatically falls back to its built-in **pure Node.js Matroska (`.mkv` /
+  `.webm`) EBML parser**. It scans the binary container directly, skips video
+  and audio blocks for speed and low memory usage, and extracts `ASS/SSA`,
+  `SRT/UTF8`, and `WebVTT` subtitle tracks (including `zlib`-compressed
+  streams) with zero external dependencies.
+- **With `ffmpeg` installed *(Recommended)*:**
+  Installing `ffmpeg` (which includes both `ffmpeg` and `ffprobe`) is
+  recommended for full format coverage, as it enables extracting embedded
+  subtitles from non-Matroska containers such as `.mp4`, `.m4v`, `.mov`, and
+  `.avi` in addition to `.mkv` / `.webm`.
+
+  On Ubuntu / Debian:
+  ```bash
+  sudo apt update && sudo apt install -y ffmpeg
+  ```
+
 ### Cleanup
 
 `server/cleanup/scheduler.js` does two things:
@@ -130,14 +162,17 @@ folder — no external services required.
 
 1. Copy the project, `npm install --omit=dev` (or just `npm install`),
    `cp .env.example .env` and edit it.
-2. Run it behind a process manager (e.g. `pm2 start server/index.js`, or a
+2. *(Optional, recommended)* Install `ffmpeg` (`sudo apt update && sudo apt install -y ffmpeg`)
+   if you want embedded subtitle extraction for `.mp4`/`.mov`/`.avi` files as
+   well (`.mkv`/`.webm` subtitles work out of the box even without `ffmpeg`).
+3. Run it behind a process manager (e.g. `pm2 start server/index.js`, or a
    systemd unit) so it restarts if it crashes.
-3. Put a reverse proxy in front (nginx/Caddy) for TLS. If you do,
+4. Put a reverse proxy in front (nginx/Caddy) for TLS. If you do,
    remember to raise `client_max_body_size` (nginx) to at least
    `MAX_UPLOAD_MB`, and make sure the proxy doesn't buffer the whole
    upload/video stream — both need range-request passthrough for large
    files.
-4. Because uploads and the SQLite file live on local disk, this app is
+5. Because uploads and the SQLite file live on local disk, this app is
    designed to run as **one instance**. Don't load-balance it across
    multiple servers without moving storage to something shared first.
 
