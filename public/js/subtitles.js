@@ -44,110 +44,88 @@ function saveSubtitleSettings(settings) {
   applySubtitleSettings();
 }
 
-// Compute CSS text-shadow based on outline settings for crisp, gapless borders
-function computeOutlineCss(borderStyle, borderColor) {
+// Compute CSS text-shadow based on outline settings and scaled proportionally to font size
+function computeOutlineCss(borderStyle, borderColor, fontSizePx = 24) {
   const color = borderColor || '#000000';
+  const factor = Math.max(0.48, Math.min(2.2, (Number(fontSizePx) || 24) / 24));
+  const px = (n) => `${(n * factor).toFixed(2)}px`;
+
   if (borderStyle === 'crunchyroll') {
-    // Crunchyroll iconic 12-point solid thick outline
+    // Crunchyroll iconic 12-point solid thick outline, scaled to font size
+    const o2 = px(2);
+    const n2 = px(-2);
+    const o1 = px(1);
+    const n1 = px(-1);
+    const blur = px(3);
     const shadow = [
-      `-2px -2px 0px ${color}`,
-      `2px -2px 0px ${color}`,
-      `-2px 2px 0px ${color}`,
-      `2px 2px 0px ${color}`,
-      `-2px 0px 0px ${color}`,
-      `2px 0px 0px ${color}`,
-      `0px -2px 0px ${color}`,
-      `0px 2px 0px ${color}`,
-      `-1px -1px 0px ${color}`,
-      `1px -1px 0px ${color}`,
-      `-1px 1px 0px ${color}`,
-      `1px 1px 0px ${color}`,
-      `0px 0px 3px rgba(0,0,0,0.8)`
+      `${n2} ${n2} 0px ${color}`,
+      `${o2} ${n2} 0px ${color}`,
+      `${n2} ${o2} 0px ${color}`,
+      `${o2} ${o2} 0px ${color}`,
+      `${n2} 0px 0px ${color}`,
+      `${o2} 0px 0px ${color}`,
+      `0px ${n2} 0px ${color}`,
+      `0px ${o2} 0px ${color}`,
+      `${n1} ${n1} 0px ${color}`,
+      `${o1} ${n1} 0px ${color}`,
+      `${n1} ${o1} 0px ${color}`,
+      `${o1} ${o1} 0px ${color}`,
+      `0px 0px ${blur} rgba(0,0,0,0.85)`
     ].join(', ');
-    return { shadow, stroke: `1.5px ${color}` };
+    return { shadow, stroke: `${px(1.5)} ${color}` };
   } else if (borderStyle === 'thick') {
+    const o3 = px(2.8);
+    const n3 = px(-2.8);
+    const o15 = px(1.4);
+    const n15 = px(-1.4);
     const shadow = [
-      `-3px -3px 0px ${color}`,
-      `3px -3px 0px ${color}`,
-      `-3px 3px 0px ${color}`,
-      `3px 3px 0px ${color}`,
-      `-3px 0px 0px ${color}`,
-      `3px 0px 0px ${color}`,
-      `0px -3px 0px ${color}`,
-      `0px 3px 0px ${color}`
+      `${n3} ${n3} 0px ${color}`,
+      `${o3} ${n3} 0px ${color}`,
+      `${n3} ${o3} 0px ${color}`,
+      `${o3} ${o3} 0px ${color}`,
+      `${n3} 0px 0px ${color}`,
+      `${o3} 0px 0px ${color}`,
+      `0px ${n3} 0px ${color}`,
+      `0px ${o3} 0px ${color}`,
+      `${n15} ${n15} 0px ${color}`,
+      `${o15} ${n15} 0px ${color}`,
+      `${n15} ${o15} 0px ${color}`,
+      `${o15} ${o15} 0px ${color}`
     ].join(', ');
-    return { shadow, stroke: `2px ${color}` };
+    return { shadow, stroke: `${px(2)} ${color}` };
   } else if (borderStyle === 'medium') {
+    const o = px(1.5);
+    const n = px(-1.5);
     const shadow = [
-      `-1.5px -1.5px 0px ${color}`,
-      `1.5px -1.5px 0px ${color}`,
-      `-1.5px 1.5px 0px ${color}`,
-      `1.5px 1.5px 0px ${color}`,
-      `-1.5px 0px 0px ${color}`,
-      `1.5px 0px 0px ${color}`,
-      `0px -1.5px 0px ${color}`,
-      `0px 1.5px 0px ${color}`
+      `${n} ${n} 0px ${color}`,
+      `${o} ${n} 0px ${color}`,
+      `${n} ${o} 0px ${color}`,
+      `${o} ${o} 0px ${color}`,
+      `${n} 0px 0px ${color}`,
+      `${o} 0px 0px ${color}`,
+      `0px ${n} 0px ${color}`,
+      `0px ${o} 0px ${color}`
     ].join(', ');
-    return { shadow, stroke: `1.2px ${color}` };
+    return { shadow, stroke: `${px(1.2)} ${color}` };
   } else if (borderStyle === 'thin') {
+    const o = px(1);
+    const n = px(-1);
     const shadow = [
-      `-1px -1px 0px ${color}`,
-      `1px -1px 0px ${color}`,
-      `-1px 1px 0px ${color}`,
-      `1px 1px 0px ${color}`
+      `${n} ${n} 0px ${color}`,
+      `${o} ${n} 0px ${color}`,
+      `${n} ${o} 0px ${color}`,
+      `${o} ${o} 0px ${color}`
     ].join(', ');
-    return { shadow, stroke: `0.8px ${color}` };
+    return { shadow, stroke: `${px(0.8)} ${color}` };
   } else if (borderStyle === 'shadow') {
-    return { shadow: `2px 2px 4px ${color}`, stroke: 'none' };
+    return { shadow: `${px(2)} ${px(2)} ${px(4)} ${color}`, stroke: 'none' };
   }
   return { shadow: 'none', stroke: 'none' };
 }
 
-// Compute fullscreen outline shadow (scaled for large fullscreen display)
-function computeFullscreenOutlineCss(borderStyle, borderColor) {
-  const color = borderColor || '#000000';
-  if (borderStyle === 'crunchyroll' || borderStyle === 'thick') {
-    return [
-      `-3.5px -3.5px 0px ${color}`,
-      `3.5px -3.5px 0px ${color}`,
-      `-3.5px 3.5px 0px ${color}`,
-      `3.5px 3.5px 0px ${color}`,
-      `-3.5px 0px 0px ${color}`,
-      `3.5px 0px 0px ${color}`,
-      `0px -3.5px 0px ${color}`,
-      `0px 3.5px 0px ${color}`,
-      `-2.5px -2.5px 0px ${color}`,
-      `2.5px -2.5px 0px ${color}`,
-      `-2.5px 2.5px 0px ${color}`,
-      `2.5px 2.5px 0px ${color}`,
-      `-1.5px -1.5px 0px ${color}`,
-      `1.5px -1.5px 0px ${color}`,
-      `-1.5px 1.5px 0px ${color}`,
-      `1.5px 1.5px 0px ${color}`,
-      `0px 0px 6px rgba(0,0,0,0.95)`
-    ].join(', ');
-  } else if (borderStyle === 'medium') {
-    return [
-      `-2.5px -2.5px 0px ${color}`,
-      `2.5px -2.5px 0px ${color}`,
-      `-2.5px 2.5px 0px ${color}`,
-      `2.5px 2.5px 0px ${color}`,
-      `-2.5px 0px 0px ${color}`,
-      `2.5px 0px 0px ${color}`,
-      `0px -2.5px 0px ${color}`,
-      `0px 2.5px 0px ${color}`
-    ].join(', ');
-  } else if (borderStyle === 'thin') {
-    return [
-      `-2px -2px 0px ${color}`,
-      `2px -2px 0px ${color}`,
-      `-2px 2px 0px ${color}`,
-      `2px 2px 0px ${color}`
-    ].join(', ');
-  } else if (borderStyle === 'shadow') {
-    return `4px 4px 8px ${color}`;
-  }
-  return 'none';
+// Compute fullscreen outline shadow (scaled for fullscreen font size)
+function computeFullscreenOutlineCss(borderStyle, borderColor, fsFontSizePx = 60) {
+  return computeOutlineCss(borderStyle, borderColor, fsFontSizePx).shadow;
 }
 
 // Compute background color CSS (Chromium WebVTT strictly requires background-color)
@@ -160,27 +138,65 @@ function computeBackgroundCss(bgStyle) {
 
 // Apply settings directly to the document and ::cue pseudo-elements in all display modes
 function applySubtitleSettings() {
-  const { shadow, stroke } = computeOutlineCss(subSettings.borderStyle, subSettings.borderColor);
-  const fsShadow = computeFullscreenOutlineCss(subSettings.borderStyle, subSettings.borderColor);
   const bg = computeBackgroundCss(subSettings.backgroundStyle);
   const fontFam = subSettings.fontFamily || "'Trebuchet MS', sans-serif";
   const textColor = subSettings.textColor || '#ffffff';
   const scale = Number(subSettings.fontSizeScale) || 1.0;
   const bottomOffset = Number.isFinite(subSettings.bottomOffset) ? subSettings.bottomOffset : 8;
 
-  // Windowed mode font size (crisp, readable on desktop / mobile windows)
-  const normalPx = Math.max(16, Math.round(24 * scale));
+  const vw = (typeof window !== 'undefined' && window.innerWidth) || 1280;
+  const vh = (typeof window !== 'undefined' && window.innerHeight) || 720;
+  const screenW = (typeof window !== 'undefined' && window.screen && window.screen.width) || vw;
+  const screenH = (typeof window !== 'undefined' && window.screen && window.screen.height) || vh;
 
-  // Fullscreen mode: calculate responsive pixel height based on screen / window dimensions
-  const screenHeight = Math.max(
-    (typeof window !== 'undefined' && window.screen && window.screen.height) || 0,
-    (typeof window !== 'undefined' && window.innerHeight) || 0,
-    1080
+  const isFs = !!(
+    typeof document !== 'undefined' &&
+    (document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement)
   );
-  // ~5.8% of screen height is the Crunchyroll fullscreen subtitle standard
-  // (e.g. ~62px on 1080p, ~84px on 1440p, ~125px on 4K)
-  const baseFsPx = Math.max(56, Math.round(screenHeight * 0.058));
-  const fullscreenPx = Math.max(48, Math.round(baseFsPx * scale));
+
+  // 1. Windowed mode font size: adapt to actual <video> dimensions or viewport width
+  // so mobile phones get compact, proportional subtitles (~12-15px) while desktop gets ~24px.
+  const vid = (typeof video !== 'undefined' && video) || (typeof document !== 'undefined' && document.getElementById('player'));
+  let baseNormalPx = 24;
+  if (vid && vid.clientWidth > 0 && vid.clientHeight > 0 && !isFs) {
+    const renderedVideoH = Math.min(vid.clientHeight, Math.round(vid.clientWidth * (9 / 16)));
+    baseNormalPx = Math.max(11, Math.min(26, Math.round(renderedVideoH * 0.055)));
+  } else if (vw <= 480) {
+    const estVideoH = Math.round((vw - 16) * (9 / 16));
+    baseNormalPx = Math.max(11, Math.min(14, Math.round(estVideoH * 0.056)));
+  } else if (vw <= 768) {
+    baseNormalPx = Math.max(13, Math.min(18, Math.round(vw * 0.024)));
+  } else if (vw <= 1024) {
+    baseNormalPx = 20;
+  }
+  const normalPx = Math.max(10, Math.round(baseNormalPx * scale));
+
+  // 2. Fullscreen mode font size: differentiate mobile/tablet screens from desktop monitors
+  const minScreenSide = Math.min(screenW, screenH);
+  const isMobileOrTablet = minScreenSide <= 768 || (vw <= 900 && vh <= 900);
+  let baseFsPx;
+  if (isMobileOrTablet) {
+    if (isFs) {
+      // Use actual fullscreen 16:9 video height
+      const fsVideoH = Math.min(vh, Math.round(vw * (9 / 16)));
+      baseFsPx = Math.max(12, Math.min(22, Math.round(fsVideoH * 0.052)));
+    } else {
+      // Pre-computed rule for mobile native fullscreen (usually landscape ~360-430px high)
+      const mobileLandscapeH = Math.min(minScreenSide, Math.round(Math.max(screenW, screenH) * (9 / 16)));
+      baseFsPx = Math.max(14, Math.min(20, Math.round(mobileLandscapeH * 0.048)));
+    }
+  } else {
+    // Desktop / large monitor fullscreen (~5.6% of screen height, e.g. ~60px on 1080p)
+    const desktopFsH = Math.max(screenH, vh, 1080);
+    baseFsPx = Math.max(48, Math.round(desktopFsH * 0.056));
+  }
+  const fullscreenPx = Math.max(12, Math.round(baseFsPx * scale));
+
+  const { shadow, stroke } = computeOutlineCss(subSettings.borderStyle, subSettings.borderColor, normalPx);
+  const fsShadow = computeFullscreenOutlineCss(subSettings.borderStyle, subSettings.borderColor, fullscreenPx);
 
   const styleElId = 'sr-sub-dynamic-styles';
   let styleEl = document.getElementById(styleElId);
@@ -770,14 +786,24 @@ function initSubtitleVideoListeners() {
   if (!vid) return;
 
   vid.addEventListener('loadedmetadata', () => {
+    applySubtitleSettings();
     enforceActiveSubtitleTrack();
   });
   vid.addEventListener('canplay', () => {
+    applySubtitleSettings();
     enforceActiveSubtitleTrack();
   });
   vid.addEventListener('play', () => {
+    applySubtitleSettings();
     enforceActiveSubtitleTrack();
   });
+
+  if (typeof ResizeObserver !== 'undefined' && !vid._subResizeObserver) {
+    vid._subResizeObserver = new ResizeObserver(() => {
+      applySubtitleSettings();
+    });
+    vid._subResizeObserver.observe(vid);
+  }
 
   if (vid.textTracks && !vid.textTracks._hasSubChangeListener) {
     vid.textTracks._hasSubChangeListener = true;
@@ -862,9 +888,17 @@ function initSubtitleEvents() {
   }
 
   ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
-    document.addEventListener(evt, onFullscreenStateChanged);
+    document.addEventListener(evt, () => {
+      onFullscreenStateChanged();
+      setTimeout(onFullscreenStateChanged, 120);
+      setTimeout(onFullscreenStateChanged, 350);
+    });
   });
   window.addEventListener('resize', onFullscreenStateChanged);
+  window.addEventListener('orientationchange', () => {
+    setTimeout(onFullscreenStateChanged, 150);
+    setTimeout(onFullscreenStateChanged, 400);
+  });
 }
 
 // Initial bootstrap

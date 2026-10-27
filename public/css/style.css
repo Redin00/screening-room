@@ -458,7 +458,7 @@ video::cue,
      1px -1px 0 #000,
     -1px  1px 0 #000,
      1px  1px 0 #000);
-  font-size: 26px;
+  font-size: clamp(12px, 3.2vmin, 26px);
   line-height: 1.35;
   white-space: pre-line;
 }
@@ -468,7 +468,7 @@ video::cue,
 video:fullscreen::cue,
 .screen-wrap:fullscreen video::cue,
 :fullscreen video::cue {
-  font-size: 60px;
+  font-size: clamp(14px, 5.2vmin, 60px);
   text-shadow: var(--sub-fullscreen-shadow,
     -3.5px -3.5px 0 #000,
      3.5px -3.5px 0 #000,
@@ -490,7 +490,7 @@ video:fullscreen::cue,
 video:-moz-full-screen::cue,
 .screen-wrap:-moz-full-screen video::cue,
 :-moz-full-screen video::cue {
-  font-size: 60px;
+  font-size: clamp(14px, 5.2vmin, 60px);
   text-shadow: var(--sub-fullscreen-shadow,
     -3.5px -3.5px 0 #000,
      3.5px -3.5px 0 #000,
@@ -512,7 +512,7 @@ video:-moz-full-screen::cue,
 video:-webkit-full-screen::cue,
 .screen-wrap:-webkit-full-screen video::cue,
 :-webkit-full-screen video::cue {
-  font-size: 60px;
+  font-size: clamp(14px, 5.2vmin, 60px);
   text-shadow: var(--sub-fullscreen-shadow,
     -3.5px -3.5px 0 #000,
      3.5px -3.5px 0 #000,
@@ -533,7 +533,7 @@ video:-webkit-full-screen::cue,
 :is(:fullscreen, :-webkit-full-screen, :-moz-full-screen)::cue,
 video:is(:fullscreen, :-webkit-full-screen, :-moz-full-screen)::cue,
 :is(:fullscreen, :-webkit-full-screen, :-moz-full-screen) video::cue {
-  font-size: 60px;
+  font-size: clamp(14px, 5.2vmin, 60px);
   text-shadow: var(--sub-fullscreen-shadow,
     -3.5px -3.5px 0 #000,
      3.5px -3.5px 0 #000,
@@ -554,7 +554,7 @@ video:is(:fullscreen, :-webkit-full-screen, :-moz-full-screen)::cue,
 body.is-video-fullscreen ::cue,
 body.is-video-fullscreen video::cue,
 video.is-video-fullscreen::cue {
-  font-size: 60px;
+  font-size: clamp(14px, 5.2vmin, 60px);
   text-shadow: var(--sub-fullscreen-shadow,
     -3.5px -3.5px 0 #000,
      3.5px -3.5px 0 #000,
