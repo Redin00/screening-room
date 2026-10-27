@@ -97,6 +97,7 @@ function recreateVideoElement() {
   if (old.className) replacement.className = old.className;
   replacement.playsInline = true;
   replacement.disablePictureInPicture = true;
+  replacement.crossOrigin = 'anonymous';
   replacement.style.cssText = old.style.cssText;
   replacement.controls = old.controls;
   replacement.muted = old.muted;
@@ -110,6 +111,9 @@ function recreateVideoElement() {
   // listeners are still attached to the now-detached old node).
   controlEmittersAttached = false;
   attachControlEmitters();
+  if (typeof initSubtitleVideoListeners === 'function') {
+    initSubtitleVideoListeners();
+  }
 }
 
 function setVideoAvailability(hasVideo) {
@@ -120,19 +124,25 @@ function setVideoAvailability(hasVideo) {
     noVideo.style.display = 'none';
     video.style.display = 'block';
     video.src = `/api/rooms/${encodeURIComponent(roomCode)}/media?t=${Date.now()}`;
-    // The new element has no <track> children yet; just reset bookkeeping.
-    resetSubtitleTracking();
-    subtitles = [];
-    subtitlesSelectedIndex = null;
-    subtitlesRequestId++;
+    if (typeof resetSubtitleTracking === 'function') {
+      resetSubtitleTracking();
+    }
+    if (subtitles && subtitles.length > 0 && typeof renderSubtitleTracks === 'function') {
+      renderSubtitleTracks();
+    }
   } else {
     noVideo.style.display = 'flex';
     video.style.display = 'none';
     video.removeAttribute('src');
-    resetSubtitleTracking();
+    if (typeof resetSubtitleTracking === 'function') {
+      resetSubtitleTracking();
+    }
     subtitles = [];
     subtitlesSelectedIndex = null;
     subtitlesRequestId++;
+    if (typeof renderSubtitleTracks === 'function') {
+      renderSubtitleTracks();
+    }
   }
 }
 
@@ -192,12 +202,14 @@ function connectSocket() {
   // This is the authoritative source — it also resets the fetch generation so
   // any in-flight fetchSubtitles() calls from a previous upload are ignored.
   socket.on('room:subtitles', ({ tracks }) => {
-    if (!video.src) return;
     subtitlesRequestId++;
     subtitles = (tracks || []).map((t) => ({
       ...t,
       vttUrl: t.vttUrl || `/api/rooms/${encodeURIComponent(roomCode)}/subtitles/${t.index}.vtt`,
     }));
+    if (subtitlesSelectedIndex == null && subtitles.length > 0) {
+      subtitlesSelectedIndex = subtitles[0].index;
+    }
     renderSubtitleTracks();
     showSubtitleSelector();
   });
@@ -262,31 +274,6 @@ function connectSocket() {
     });
   });
 
-  // Volume slider: local action, always available. Emit to server for ack only.
-  const volumeSlider = document.getElementById('viewer-volume');
-  if (volumeSlider) {
-    volumeSlider.addEventListener('input', () => {
-      video.volume = parseFloat(volumeSlider.value);
-      if (socket && socket.connected) {
-        socket.emit('room:command', { type: 'volume', data: { volume: video.volume } });
-      }
-    });
-  }
-
-  // Subtitle selector: only wired for authorized controllers; changing it emits
-  // a room:subtitle command that the server authorizes like play/pause/seek.
-  // (The HTML #subtitle-select element has been removed — native video controls
-  // handle subtitle selection via the <track> elements.)
-  /* const subtitleSelect = document.getElementById('subtitle-select'); */
-
-  // Fullscreen button: local action, always available.
-  // (The HTML #fullscreen-btn element has been removed — use the native video
-  // controls' fullscreen button instead.)
-  /* document.getElementById('fullscreen-btn').addEventListener('click', () => {
-    if (socket && socket.connected) {
-      socket.emit('room:command', { type: 'fullscreen' });
-    }
-  }); */
 }
 
 function updateViewerCount(n) {
@@ -294,18 +281,21 @@ function updateViewerCount(n) {
 }
 
 function canControl() {
-  if (isHost) return true;
+  if (isHost || (me && me.is_admin)) return true;
   return controlList.includes(myProfileId);
 }
 
 function applyRole() {
   const controlsContainer = document.getElementById('center-controls');
   const privBtn = document.getElementById('private-toggle-btn');
-  if (isHost) {
+  const isAdmin = me && !!me.is_admin;
+  const effectiveHost = isHost || isAdmin;
+
+  if (effectiveHost) {
     document.getElementById('host-controls').style.display = 'flex';
     document.getElementById('viewer-note').style.display = 'none';
     document.getElementById('role-badge').style.display = 'inline-block';
-    document.getElementById('role-badge').textContent = 'Host';
+    document.getElementById('role-badge').textContent = isAdmin && !isHost ? 'Admin' : 'Host';
     document.getElementById('end-room-btn').style.display = 'inline-block';
     if (controlsContainer) controlsContainer.style.display = 'flex';
     if (privBtn) privBtn.style.display = 'inline-block';
@@ -320,21 +310,14 @@ function applyRole() {
     if (privBtn) privBtn.style.display = 'none';
     video.muted = true;
 
-    const canControl = controlList.includes(myProfileId);
-    // Native video controls stay visible for everyone — hiding them hurts mobile UX.
-    // applyRemoteState uses a pending-events counter (and a timeout fallback) so
-    // the seeked/play/pause events it triggers don't re-enable emitCommand and
-    // cause a deny loop for viewers without control access.
+    const canCtrl = canControl();
     video.controls = true;
-    if (canControl) {
+    if (canCtrl) {
       video.muted = false;
     }
-    // Unmute is a local action — any viewer can unmute themselves, no control
-    // access required. Show the unmute button for everyone who's currently muted.
-    if (video.muted && !document.getElementById('unmute-btn')) addUnmuteButton();
 
     // Show upload UI for viewers who have upload permission.
-    const canUpload = uploadList.includes(myProfileId);
+    const canUpload = uploadList.includes(myProfileId) || isAdmin;
     const viewerUploadLabel = document.getElementById('viewer-upload-label');
     const viewerUploadProgress = document.getElementById('viewer-upload-progress');
     const viewerFileInput = document.getElementById('viewer-file-input');
@@ -424,19 +407,6 @@ function startControlStatusPoll() {
   }, 3000);
 }
 
-function addUnmuteButton() {
-  if (document.getElementById('unmute-btn')) return;
-  const btn = document.createElement('button');
-  btn.id = 'unmute-btn';
-  btn.className = 'btn-ghost btn-small';
-  btn.type = 'button';
-  btn.textContent = 'Unmute';
-  btn.addEventListener('click', () => {
-    video.muted = false;
-    btn.remove();
-  });
-  document.getElementById('viewer-note').appendChild(btn);
-}
 
 function applyRemoteState(state) {
   if (!state || video.style.display === 'none') return;
@@ -630,6 +600,7 @@ function uploadFile(file, progressId, successMsg) {
     if (xhr.status >= 200 && xhr.status < 300) {
       showToast(successMsg);
       setVideoAvailability(true);
+      fetchSubtitles();
     } else {
       let msg = 'Upload failed.';
       try { msg = JSON.parse(xhr.responseText).error || msg; } catch (_) {}

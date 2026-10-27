@@ -352,11 +352,15 @@ function resetSubtitleTracking() {
 
 // Rebuild track elements & sync native video captions
 function renderSubtitleTracks() {
+  const vid = (typeof video !== 'undefined' && video) || document.getElementById('player');
+  if (!vid) return;
+
   const signature = subtitlesSignature(subtitles);
-  const listChanged = signature !== _renderedSubtitlesSignature;
+  const hasNoTracksInDom = vid.querySelectorAll('track').length === 0 && subtitles.length > 0;
+  const listChanged = (signature !== _renderedSubtitlesSignature) || hasNoTracksInDom;
 
   if (listChanged) {
-    video.querySelectorAll('track').forEach((t) => t.remove());
+    vid.querySelectorAll('track').forEach((t) => t.remove());
     _renderedSubtitlesSignature = signature;
 
     if (!subtitles.length) {
@@ -364,22 +368,22 @@ function renderSubtitleTracks() {
       return;
     }
 
-    if (video.textTracks) {
-      for (let i = 0; i < video.textTracks.length; i++) {
-        video.textTracks[i].mode = 'disabled';
+    if (vid.textTracks) {
+      for (let i = 0; i < vid.textTracks.length; i++) {
+        vid.textTracks[i].mode = 'disabled';
       }
     }
 
     const selectedForCreate = subtitlesSelectedIndex != null
       ? subtitles.find((s) => s.index === subtitlesSelectedIndex)
-      : null;
+      : (subtitles.length > 0 ? subtitles[0] : null);
 
     for (const s of subtitles) {
       const track = document.createElement('track');
       track.kind = 'subtitles';
       track.label = s.label;
       track.srclang = s.srclang || '';
-      track.default = s === selectedForCreate;
+      track.default = (s === selectedForCreate);
       track.src = s.vttUrl;
       track.dataset.index = String(s.index);
 
@@ -390,7 +394,11 @@ function renderSubtitleTracks() {
         }
       });
 
-      video.appendChild(track);
+      track.addEventListener('error', (err) => {
+        console.warn(`Subtitle track failed to load: ${s.label} (${s.vttUrl})`, err);
+      });
+
+      vid.appendChild(track);
     }
   } else if (!subtitles.length) {
     syncSubtitleSelect(null);
@@ -405,21 +413,23 @@ function renderSubtitleTracks() {
 
   // Sync mode on video.textTracks
   requestAnimationFrame(() => {
-    if (!video.textTracks) return;
+    if (!vid || !vid.textTracks) return;
     const currentSubtitles = subtitles;
     if (!currentSubtitles.length) return;
     const currentSelected = subtitlesSelectedIndex != null
       ? currentSubtitles.find((s) => s.index === subtitlesSelectedIndex)
       : null;
 
-    for (let i = 0; i < video.textTracks.length; i++) {
-      const tt = video.textTracks[i];
+    for (let i = 0; i < vid.textTracks.length; i++) {
+      const tt = vid.textTracks[i];
       const matchingTrack = currentSubtitles.find((s) => {
-        const el = video.querySelector(`track[data-index="${s.index}"]`);
+        const el = vid.querySelector(`track[data-index="${s.index}"]`);
         return el && el.track === tt;
       });
-      if (matchingTrack && matchingTrack === currentSelected) {
-        tt.mode = 'showing';
+      if (matchingTrack) {
+        // Active selected track is 'showing'; other available tracks are 'hidden'
+        // so that the browser loads them and makes them available in the native CC menu!
+        tt.mode = (currentSelected && matchingTrack === currentSelected) ? 'showing' : 'hidden';
       } else {
         tt.mode = 'disabled';
       }
@@ -464,13 +474,16 @@ function showSubtitleSelector() {
 
 function selectSubtitle(index) {
   subtitlesSelectedIndex = index;
-  video.querySelectorAll('track').forEach((t) => {
+  const vid = (typeof video !== 'undefined' && video) || document.getElementById('player');
+  if (!vid) return;
+
+  vid.querySelectorAll('track').forEach((t) => {
     t.default = false;
   });
 
   const selectedTrack = subtitles.find((s) => s.index === index);
   if (index >= 0 && selectedTrack) {
-    const track = video.querySelector(`track[data-index="${index}"]`);
+    const track = vid.querySelector(`track[data-index="${index}"]`);
     if (track) {
       track.default = true;
       if (track.track) track.track.mode = 'showing';
@@ -479,22 +492,22 @@ function selectSubtitle(index) {
 
   syncSubtitleSelect(selectedTrack || null);
 
-  if (video.textTracks) {
-    for (let i = 0; i < video.textTracks.length; i++) {
-      const tt = video.textTracks[i];
+  if (vid.textTracks) {
+    for (let i = 0; i < vid.textTracks.length; i++) {
+      const tt = vid.textTracks[i];
       const matchingTrack = subtitles.find((s) => {
-        const el = video.querySelector(`track[data-index="${s.index}"]`);
+        const el = vid.querySelector(`track[data-index="${s.index}"]`);
         return el && el.track === tt;
       });
-      if (matchingTrack && matchingTrack.index === index) {
-        tt.mode = 'showing';
+      if (matchingTrack) {
+        tt.mode = (matchingTrack.index === index) ? 'showing' : 'hidden';
       } else {
         tt.mode = 'disabled';
       }
     }
   }
 
-  if (canControl() && socket && socket.connected) {
+  if (typeof canControl === 'function' && canControl() && socket && socket.connected) {
     socket.emit('room:subtitle', { index });
   }
 }
@@ -715,30 +728,22 @@ function initSubtitleModal() {
   }
 }
 
-function initSubtitleEvents() {
+function initSubtitleVideoListeners() {
   const vid = (typeof video !== 'undefined' && video) || document.getElementById('player');
-  if (vid) {
-    vid.addEventListener('loadedmetadata', () => applyBottomOffsetToTracks());
-    vid.addEventListener('play', () => applyBottomOffsetToTracks());
-  }
+  if (!vid) return;
 
-  const sel = document.getElementById('subtitle-select');
-  if (sel) {
-    sel.addEventListener('change', (e) => {
-      const idx = parseInt(e.target.value, 10);
-      selectSubtitle(idx);
-    });
-  }
+  vid.addEventListener('loadedmetadata', () => applyBottomOffsetToTracks());
+  vid.addEventListener('play', () => applyBottomOffsetToTracks());
 
-  // Bidirectional sync: if user changes subtitle track via browser's native controls
-  if (video && video.textTracks) {
-    video.textTracks.addEventListener('change', () => {
+  if (vid.textTracks && !vid.textTracks._hasSubChangeListener) {
+    vid.textTracks._hasSubChangeListener = true;
+    vid.textTracks.addEventListener('change', () => {
       let activeIdx = -1;
-      for (let i = 0; i < video.textTracks.length; i++) {
-        const tt = video.textTracks[i];
+      for (let i = 0; i < vid.textTracks.length; i++) {
+        const tt = vid.textTracks[i];
         if (tt.mode === 'showing') {
           const matchingTrack = subtitles.find((s) => {
-            const el = video.querySelector(`track[data-index="${s.index}"]`);
+            const el = vid.querySelector(`track[data-index="${s.index}"]`);
             return el && el.track === tt;
           });
           if (matchingTrack) {
@@ -750,10 +755,22 @@ function initSubtitleEvents() {
       if (activeIdx !== subtitlesSelectedIndex) {
         subtitlesSelectedIndex = activeIdx;
         syncSubtitleSelect(subtitles.find(s => s.index === activeIdx) || null);
-        if (canControl() && socket && socket.connected) {
+        if (typeof canControl === 'function' && canControl() && socket && socket.connected) {
           socket.emit('room:subtitle', { index: activeIdx });
         }
       }
+    });
+  }
+}
+
+function initSubtitleEvents() {
+  initSubtitleVideoListeners();
+
+  const sel = document.getElementById('subtitle-select');
+  if (sel) {
+    sel.addEventListener('change', (e) => {
+      const idx = parseInt(e.target.value, 10);
+      selectSubtitle(idx);
     });
   }
 
@@ -765,21 +782,26 @@ function initSubtitleEvents() {
       document.mozFullScreenElement ||
       document.msFullscreenElement
     );
+    const vid = (typeof video !== 'undefined' && video) || document.getElementById('player');
     if (isFs) {
       document.body.classList.add('is-video-fullscreen');
-      if (video) video.classList.add('is-video-fullscreen');
+      if (vid) vid.classList.add('is-video-fullscreen');
     } else {
       document.body.classList.remove('is-video-fullscreen');
-      if (video) video.classList.remove('is-video-fullscreen');
+      if (vid) vid.classList.remove('is-video-fullscreen');
     }
 
     applySubtitleSettings();
 
-    if (video && video.textTracks && subtitlesSelectedIndex != null) {
-      for (let i = 0; i < video.textTracks.length; i++) {
-        const tt = video.textTracks[i];
-        if (tt.mode !== 'disabled') {
-          tt.mode = 'showing';
+    if (vid && vid.textTracks && subtitlesSelectedIndex != null) {
+      for (let i = 0; i < vid.textTracks.length; i++) {
+        const tt = vid.textTracks[i];
+        const matchingTrack = subtitles.find((s) => {
+          const el = vid.querySelector(`track[data-index="${s.index}"]`);
+          return el && el.track === tt;
+        });
+        if (matchingTrack) {
+          tt.mode = (matchingTrack.index === subtitlesSelectedIndex) ? 'showing' : 'hidden';
         }
       }
     }

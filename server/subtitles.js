@@ -35,6 +35,7 @@ function convertAssToVtt(assContent) {
   let section = '';
   const events = [];
   let eventFormat = [];
+  let styleFormat = [];
 
   for (let line of lines) {
     const trimmed = line.trim();
@@ -268,7 +269,18 @@ function probeSubtitleStreams(videoPath) {
       videoPath,
     ], { encoding: 'utf8', timeout: 30000 }).trim();
   } catch (err) {
-    return [];
+    console.warn(`ffprobe stream_tags probe failed for ${videoPath}, falling back to general tags:`, err.message);
+    try {
+      out = execFileSync('ffprobe', [
+        '-v', 'error',
+        '-show_entries', 'stream=index,codec_type,codec_name,tags',
+        '-of', 'json',
+        videoPath,
+      ], { encoding: 'utf8', timeout: 30000 }).trim();
+    } catch (err2) {
+      console.error(`ffprobe fallback probe failed for ${videoPath}:`, err2.message);
+      return [];
+    }
   }
   if (!out) return [];
 
@@ -314,10 +326,12 @@ function extractSubtitleToVtt(videoPath, streamIndex, outDir, codec) {
 
       if (fs.existsSync(assPath)) {
         const assContent = fs.readFileSync(assPath, 'utf8');
-        const vttContent = convertAssToVtt(assContent);
-        fs.writeFileSync(vttPath, vttContent, 'utf8');
         try { fs.unlinkSync(assPath); } catch (_) {}
-        return vttPath;
+        const vttContent = convertAssToVtt(assContent);
+        if (vttContent && vttContent.length > 20) {
+          fs.writeFileSync(vttPath, vttContent, 'utf8');
+          return vttPath;
+        }
       }
     } catch (err) {
       console.warn(`ASS lossless extraction failed for stream ${streamIndex}, falling back to ffmpeg webvtt:`, err.message);
@@ -325,13 +339,33 @@ function extractSubtitleToVtt(videoPath, streamIndex, outDir, codec) {
   }
 
   // Fallback or non-ASS subtitle streams
-  execFileSync('ffmpeg', [
-    '-y',
-    '-i', videoPath,
-    '-map', `0:s:${streamIndex}`,
-    '-c:s', 'webvtt',
-    vttPath,
-  ], { encoding: 'utf8', timeout: 120000, stdio: 'pipe' });
+  let extractionDone = false;
+  try {
+    execFileSync('ffmpeg', [
+      '-y',
+      '-i', videoPath,
+      '-map', `0:s:${streamIndex}`,
+      '-c:s', 'webvtt',
+      vttPath,
+    ], { encoding: 'utf8', timeout: 120000, stdio: 'pipe' });
+    extractionDone = fs.existsSync(vttPath);
+  } catch (err) {
+    console.warn(`ffmpeg -map 0:s:${streamIndex} failed, trying stream index fallback:`, err.message);
+  }
+
+  if (!extractionDone) {
+    try {
+      execFileSync('ffmpeg', [
+        '-y',
+        '-i', videoPath,
+        '-map', `0:${streamIndex}`,
+        '-c:s', 'webvtt',
+        vttPath,
+      ], { encoding: 'utf8', timeout: 120000, stdio: 'pipe' });
+    } catch (err2) {
+      console.error(`ffmpeg fallback -map 0:${streamIndex} failed:`, err2.message);
+    }
+  }
 
   if (!fs.existsSync(vttPath)) {
     throw new Error(`ffmpeg did not produce ${vttName}`);
