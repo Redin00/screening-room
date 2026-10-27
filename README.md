@@ -25,11 +25,13 @@ Plain Node.js — no build step, no framework lock-in:
 - **multer** for uploads, restricted to video file extensions/MIME types
 - Vanilla HTML/CSS/JS on the frontend (`public/`), no bundler required
 
-> Requires **Node 22.5 or newer** (when `node:sqlite` was introduced). It's
-> still marked experimental by Node itself — you'll see one warning line on
-> startup, which is expected and harmless. Check your version with
-> `node --version` before installing.
->
+> [!IMPORTANT]
+> **Node.js version:** Requires **Node 22.5 or newer** (when `node:sqlite` was
+> introduced). It's still marked experimental by Node itself — you'll see one
+> warning line on startup, which is expected and harmless. Check your version
+> with `node --version` before installing.
+
+> [!TIP]
 > **`ffmpeg` is optional (but recommended):** `.mkv` and `.webm` embedded
 > subtitles (`ASS/SSA`, `SRT`, `WebVTT`) are extracted natively in pure
 > Node.js even without `ffmpeg` installed. Installing `ffmpeg` is
@@ -114,23 +116,26 @@ extracts embedded subtitle tracks to `.vtt` (`WebVTT`) files, preserving
 Crunchyroll-style typography, custom appearance settings (font, size, colors,
 border, bottom margin), and positioning tags (`{\an8}`, `{\pos(x,y)}`).
 
-- **Without `ffmpeg` installed (Pure Node.js fallback):**
-  If `ffmpeg` / `ffprobe` are not installed on the system, Screening Room
-  automatically falls back to its built-in **pure Node.js Matroska (`.mkv` /
-  `.webm`) EBML parser**. It scans the binary container directly, skips video
-  and audio blocks for speed and low memory usage, and extracts `ASS/SSA`,
-  `SRT/UTF8`, and `WebVTT` subtitle tracks (including `zlib`-compressed
-  streams) with zero external dependencies.
-- **With `ffmpeg` installed *(Recommended)*:**
-  Installing `ffmpeg` (which includes both `ffmpeg` and `ffprobe`) is
-  recommended for full format coverage, as it enables extracting embedded
-  subtitles from non-Matroska containers such as `.mp4`, `.m4v`, `.mov`, and
-  `.avi` in addition to `.mkv` / `.webm`.
+> [!NOTE]
+> **Without `ffmpeg` installed (Pure Node.js fallback):**
+> If `ffmpeg` / `ffprobe` are not installed on the system, Screening Room
+> automatically falls back to its built-in **pure Node.js Matroska (`.mkv` /
+> `.webm`) EBML parser**. It scans the binary container directly, skips video
+> and audio blocks for speed and low memory usage, and extracts `ASS/SSA`,
+> `SRT/UTF8`, and `WebVTT` subtitle tracks (including `zlib`-compressed
+> streams) with zero external dependencies.
 
-  On Ubuntu / Debian:
-  ```bash
-  sudo apt update && sudo apt install -y ffmpeg
-  ```
+> [!TIP]
+> **With `ffmpeg` installed *(Recommended)*:**
+> Installing `ffmpeg` (which includes both `ffmpeg` and `ffprobe`) is
+> recommended for full format coverage, as it enables extracting embedded
+> subtitles from non-Matroska containers such as `.mp4`, `.m4v`, `.mov`, and
+> `.avi` in addition to `.mkv` / `.webm`.
+>
+> On Ubuntu / Debian:
+> ```bash
+> sudo apt update && sudo apt install -y ffmpeg
+> ```
 
 ### Cleanup
 
