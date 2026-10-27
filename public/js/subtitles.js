@@ -509,8 +509,10 @@ function syncSubtitleSelect(selected) {
 
 function showSubtitleSelector() {
   const btn = document.getElementById('subtitle-settings-btn');
+  const vid = (typeof video !== 'undefined' && video) || document.getElementById('player');
   if (btn) {
-    btn.style.display = (subtitles && subtitles.length > 0) ? 'inline-flex' : 'none';
+    const hasVid = Boolean(vid && vid.style.display !== 'none');
+    btn.style.display = (hasVid || (subtitles && subtitles.length > 0)) ? 'inline-flex' : 'none';
   }
 }
 
