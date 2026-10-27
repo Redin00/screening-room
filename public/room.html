@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Screening Room — Room</title>
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/style.css?v=4">
 </head>
 <body>
   <div class="stage">
@@ -28,7 +28,7 @@
         <h3>Nothing queued up yet</h3>
         <p id="no-video-text">Waiting for the host to upload a video.</p>
       </div>
-      <video id="player" style="display:none;" playsinline disablePictureInPicture crossorigin="anonymous"></video>
+      <video id="player" style="display:none;" playsinline disablePictureInPicture></video>
     </div>
 
     <div class="control-strip">
@@ -181,8 +181,8 @@
   <div class="toast" id="toast" style="display:none;"></div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/js/api.js"></script>
-  <script src="/js/room.js"></script>
-  <script src="/js/subtitles.js"></script>
+  <script src="/js/api.js?v=4"></script>
+  <script src="/js/room.js?v=4"></script>
+  <script src="/js/subtitles.js?v=4"></script>
 </body>
 </html>

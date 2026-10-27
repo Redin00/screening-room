@@ -61,11 +61,15 @@ function cancelScheduledDeletion(roomId) {
   db.prepare('UPDATE rooms SET delete_at = NULL WHERE id = ?').run(roomId);
 }
 
+function toSqliteUtc(date) {
+  return date.toISOString().replace('T', ' ').slice(0, 19);
+}
+
 function scheduleDeletion(roomId, delayMinutes = config.deleteDelayMinutes) {
   cancelScheduledDeletion(roomId);
   const delayMs = Math.max(0, delayMinutes * 60 * 1000);
   const deleteAt = new Date(Date.now() + delayMs);
-  db.prepare('UPDATE rooms SET delete_at = ? WHERE id = ?').run(deleteAt.toISOString(), roomId);
+  db.prepare('UPDATE rooms SET delete_at = ? WHERE id = ?').run(toSqliteUtc(deleteAt), roomId);
 
   const timer = setTimeout(() => deleteRoomVideo(roomId), delayMs);
   timer.unref();
@@ -103,8 +107,20 @@ function sweepOrphanUploads() {
       if (!match) continue;
       const roomId = parseInt(match[1], 10);
       const room = db.prepare('SELECT id, status, video_path FROM rooms WHERE id = ?').get(roomId);
-      if (!room || room.status === 'closed' || !room.video_path) {
-        const fullDir = path.join(config.uploadsDir, entry.name);
+      const fullDir = path.join(config.uploadsDir, entry.name);
+      let shouldDelete = false;
+      if (!room || room.status === 'closed') {
+        shouldDelete = true;
+      } else if (!room.video_path) {
+        // Protect active in-progress uploads: only delete if untouched for > 30 minutes
+        try {
+          const stat = fs.statSync(fullDir);
+          if (Date.now() - stat.mtimeMs > 30 * 60 * 1000) {
+            shouldDelete = true;
+          }
+        } catch (_) {}
+      }
+      if (shouldDelete) {
         try {
           fs.rmSync(fullDir, { recursive: true, force: true });
           console.log(`Cleaned up orphaned upload directory: ${entry.name}`);
@@ -125,8 +141,9 @@ function restorePendingTimers() {
     .prepare(`SELECT id, delete_at FROM rooms WHERE delete_at IS NOT NULL`)
     .all();
   for (const row of pending) {
-    const due = new Date(row.delete_at).getTime();
-    const remainingMs = Math.max(0, due - now);
+    const isoStr = row.delete_at.includes('T') ? row.delete_at : row.delete_at.replace(' ', 'T') + 'Z';
+    const due = new Date(isoStr).getTime();
+    const remainingMs = Number.isNaN(due) ? 0 : Math.max(0, due - now);
     const timer = setTimeout(() => deleteRoomVideo(row.id), remainingMs);
     timer.unref();
     pendingTimers.set(row.id, timer);
@@ -137,24 +154,25 @@ function restorePendingTimers() {
 // that have been empty too long, purges stale closed rooms, and sweeps orphan folders.
 function sweep() {
   const now = new Date();
+  const nowSqlite = toSqliteUtc(now);
 
   // 1. Delete rooms / files whose scheduled deletion time has arrived
   const overdue = db
-    .prepare(`SELECT id FROM rooms WHERE delete_at IS NOT NULL AND delete_at <= ?`)
-    .all(now.toISOString());
+    .prepare(`SELECT id FROM rooms WHERE delete_at IS NOT NULL AND datetime(delete_at) <= datetime(?)`)
+    .all(nowSqlite);
   for (const row of overdue) {
     deleteRoomVideo(row.id);
   }
 
   // 2. Auto-close orphaned rooms that have had 0 viewers for orphanRoomMinutes.
   // Checks all non-closed rooms (both 'active' and 'waiting').
-  const orphanCutoff = new Date(now.getTime() - config.orphanRoomMinutes * 60 * 1000).toISOString();
+  const orphanCutoff = toSqliteUtc(new Date(now.getTime() - config.orphanRoomMinutes * 60 * 1000));
   const orphaned = db
     .prepare(
       `SELECT id, code FROM rooms
        WHERE status != 'closed'
          AND viewer_count = 0
-         AND COALESCE(last_empty_at, created_at) <= ?`
+         AND datetime(COALESCE(last_empty_at, created_at)) <= datetime(?)`
     )
     .all(orphanCutoff);
   for (const room of orphaned) {
@@ -164,15 +182,15 @@ function sweep() {
 
   // 3. Purge stale closed rooms that were closed > deleteDelayMinutes ago
   // and have no active video or pending delete timer.
-  const closedCutoff = new Date(now.getTime() - config.deleteDelayMinutes * 60 * 1000).toISOString();
+  const closedCutoff = toSqliteUtc(new Date(now.getTime() - config.deleteDelayMinutes * 60 * 1000));
   const staleClosed = db
     .prepare(
       `SELECT id FROM rooms
        WHERE status = 'closed'
-         AND (delete_at IS NULL OR delete_at <= ?)
-         AND (closed_at IS NULL OR closed_at <= ?)`
+         AND (delete_at IS NULL OR datetime(delete_at) <= datetime(?))
+         AND (closed_at IS NULL OR datetime(closed_at) <= datetime(?))`
     )
-    .all(now.toISOString(), closedCutoff);
+    .all(nowSqlite, closedCutoff);
   for (const row of staleClosed) {
     deleteRoomVideo(row.id);
   }

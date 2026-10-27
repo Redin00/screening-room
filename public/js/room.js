@@ -12,6 +12,7 @@ let uploadList = [];
 let subtitles = [];
 let subtitlesSelectedIndex = null;
 let subtitlesRequestId = 0;
+let _lastVideoLoadedAt = 0;
 let members = [];
 let controlPanelOpen = false;
 
@@ -97,7 +98,6 @@ function recreateVideoElement() {
   if (old.className) replacement.className = old.className;
   replacement.playsInline = true;
   replacement.disablePictureInPicture = true;
-  replacement.crossOrigin = 'anonymous';
   replacement.style.cssText = old.style.cssText;
   replacement.controls = old.controls;
   replacement.muted = old.muted;
@@ -118,6 +118,7 @@ function recreateVideoElement() {
 
 function setVideoAvailability(hasVideo) {
   if (hasVideo) {
+    _lastVideoLoadedAt = Date.now();
     // Fresh element per video so the native captions menu can't accumulate
     // entries from previous uploads (see recreateVideoElement above).
     recreateVideoElement();
@@ -156,8 +157,9 @@ function connectSocket() {
     setTimeout(() => (window.location.href = '/lobby.html'), 2000);
   });
 
-  socket.on('room:joined', ({ isHost: hostFlag, profileId, displayName, viewerCount, lastState, controlList: ctrlList, uploadList: ulList, members: membersList, subtitleIndex: serverSubtitleIndex }) => {
+  socket.on('room:joined', ({ isHost: hostFlag, isAdmin: adminFlag, profileId, displayName, viewerCount, lastState, controlList: ctrlList, uploadList: ulList, members: membersList, subtitleIndex: serverSubtitleIndex }) => {
     isHost = hostFlag;
+    if (adminFlag && me) me.isAdmin = true;
     myProfileId = profileId;
     controlList = ctrlList || [];
     uploadList = ulList || [];
@@ -167,7 +169,7 @@ function connectSocket() {
     if (membersList) renderMembers(membersList);
     if (video.style.display !== 'none') {
       applyRemoteState(lastState);
-      if (serverSubtitleIndex != null) {
+      if (serverSubtitleIndex != null && serverSubtitleIndex >= 0) {
         subtitlesSelectedIndex = serverSubtitleIndex;
         renderSubtitleTracks();
       }
@@ -207,7 +209,10 @@ function connectSocket() {
       ...t,
       vttUrl: t.vttUrl || `/api/rooms/${encodeURIComponent(roomCode)}/subtitles/${t.index}.vtt`,
     }));
-    if (subtitlesSelectedIndex == null && subtitles.length > 0) {
+    if (
+      subtitles.length > 0 &&
+      (subtitlesSelectedIndex == null || !subtitles.some((t) => t.index === subtitlesSelectedIndex))
+    ) {
       subtitlesSelectedIndex = subtitles[0].index;
     }
     renderSubtitleTracks();
@@ -243,6 +248,7 @@ function connectSocket() {
 
   // Someone uploaded a new video. Reload the player source so everyone sees it.
   socket.on('room:video', ({ videoName }) => {
+    subtitlesSelectedIndex = null;
     setVideoAvailability(true);
     const el = document.getElementById('no-video-text');
     if (el) el.textContent = `Now playing: ${videoName}`;
@@ -254,6 +260,11 @@ function connectSocket() {
     }
     // Also fetch the subtitle tracks for the newly-uploaded video.
     fetchSubtitles();
+  });
+
+  socket.on('room:ended', ({ message }) => {
+    showToast(message || 'The screening has ended.');
+    setTimeout(() => (window.location.href = '/lobby.html'), 1500);
   });
 
   // Show who is currently in the room.
@@ -281,14 +292,14 @@ function updateViewerCount(n) {
 }
 
 function canControl() {
-  if (isHost || (me && me.is_admin)) return true;
+  if (isHost || (me && (me.isAdmin || me.is_admin))) return true;
   return controlList.includes(myProfileId);
 }
 
 function applyRole() {
   const controlsContainer = document.getElementById('center-controls');
   const privBtn = document.getElementById('private-toggle-btn');
-  const isAdmin = me && !!me.is_admin;
+  const isAdmin = Boolean(me && (me.isAdmin || me.is_admin));
   const effectiveHost = isHost || isAdmin;
 
   if (effectiveHost) {
@@ -430,7 +441,10 @@ function applyRemoteState(state) {
     }
 
     if (state.playing && playingChanged) {
-      video.play().catch(() => addUnmuteButton());
+      video.play().catch(() => {
+        video.muted = true;
+        video.play().catch(() => {});
+      });
       pendingEvents++;
     } else if (!state.playing && playingChanged) {
       video.pause();
@@ -554,7 +568,8 @@ function renderMembers(memberList) {
     btn.addEventListener('click', () => {
       const raw = btn.getAttribute('data-action');
       const id = parseInt(btn.getAttribute('data-id'), 10);
-      if (!isHost || !socket) return;
+      const isAdmin = Boolean(me && (me.isAdmin || me.is_admin));
+      if (!(isHost || isAdmin) || !socket) return;
       const [act, scope] = raw.split('-');
       socket.emit('room:control-list-update', { action: act, list: scope, profileId: id });
     });
@@ -599,7 +614,13 @@ function uploadFile(file, progressId, successMsg) {
     document.getElementById(progressId).textContent = '';
     if (xhr.status >= 200 && xhr.status < 300) {
       showToast(successMsg);
-      setVideoAvailability(true);
+      // Only trigger setVideoAvailability if the room:video socket event hasn't
+      // already recreated the video element in the last few seconds. Recreating
+      // the video element twice destroys the <track> elements added by room:subtitles!
+      if (video.style.display === 'none' || Date.now() - _lastVideoLoadedAt > 4000) {
+        subtitlesSelectedIndex = null;
+        setVideoAvailability(true);
+      }
       fetchSubtitles();
     } else {
       let msg = 'Upload failed.';

@@ -241,9 +241,16 @@ router.get('/:code/subtitles', loadRoom, (req, res) => {
   let tracks = [];
   try { tracks = room.subtitles ? JSON.parse(room.subtitles) : []; } catch (_) { tracks = []; }
 
+  const dir = scheduler.roomDir(room.id);
+  const anyMissingOnDisk = tracks.some((t) => {
+    if (t.vttPath && fs.existsSync(t.vttPath)) return false;
+    if (t.vttPath && fs.existsSync(path.join(dir, path.basename(t.vttPath)))) return false;
+    return true;
+  });
+
   // Auto-extraction safeguard: if video exists but tracks were never persisted
-  // or extraction was interrupted, probe and persist them now.
-  if (tracks.length === 0) {
+  // or VTT files are missing on disk, probe and persist them now.
+  if (tracks.length === 0 || anyMissingOnDisk) {
     try {
       tracks = subtitles.extractAndPersistSubtitles(videoPath, room.id);
     } catch (err) {
@@ -305,7 +312,7 @@ router.get('/:code/subtitles/:index.vtt', loadRoom, (req, res) => {
     if (videoPath) candidates.push(path.join(path.dirname(videoPath), `${videoBase}.s${track.index}.vtt`));
   }
 
-  let finalVttPath = candidates.find((p) => p && fs.existsSync(p));
+  let finalVttPath = candidates.find((p) => p && fs.existsSync(p) && fs.statSync(p).size > 10);
 
   // If still missing on disk, dynamically extract this specific track on demand!
   if (!finalVttPath && videoPath && fs.existsSync(videoPath)) {
@@ -328,17 +335,11 @@ router.get('/:code/subtitles/:index.vtt', loadRoom, (req, res) => {
   const stat = fs.statSync(finalVttPath);
   const range = req.headers.range;
 
-  res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type');
-  res.setHeader('Cache-Control', 'no-cache');
-
   if (!range) {
     res.writeHead(200, {
       'Content-Length': stat.size,
       'Content-Type': 'text/vtt; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
+      'Accept-Ranges': 'bytes',
       'Cache-Control': 'no-cache',
     });
     fs.createReadStream(finalVttPath).pipe(res);
@@ -356,7 +357,6 @@ router.get('/:code/subtitles/:index.vtt', loadRoom, (req, res) => {
     'Accept-Ranges': 'bytes',
     'Content-Length': end - start + 1,
     'Content-Type': 'text/vtt; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
     'Cache-Control': 'no-cache',
   });
   fs.createReadStream(finalVttPath, { start, end }).pipe(res);

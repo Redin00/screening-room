@@ -174,9 +174,14 @@ function convertAssToVtt(assContent) {
     text = text.replace(/\{\\u1\}/gi, '<u>').replace(/\{\\u0\}/gi, '</u>');
     // Remove all remaining ASS override tags like {\...}
     text = text.replace(/\{[^}]*\}/g, '');
-    text = text.trim();
+    text = text.replace(/-->/g, '->');
+    text = text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join('\n');
 
-    if (!text) continue;
+    if (!text || startVtt === endVtt) continue;
     vtt += `${startVtt} --> ${endVtt}${cueSettings ? ' ' + cueSettings : ''}\n${text}\n\n`;
   }
   return vtt;
@@ -191,19 +196,29 @@ function sanitizeAndEnhanceVtt(vttPath) {
   const outLines = [];
   let inCue = false;
   let currentTimingIdx = -1;
+  let currentCueHasText = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line.includes('-->')) {
+      if (inCue && !currentCueHasText && currentTimingIdx === outLines.length - 1) {
+        outLines.pop();
+      }
       outLines.push(line);
       currentTimingIdx = outLines.length - 1;
       inCue = true;
+      currentCueHasText = false;
       continue;
     }
     if (!line.trim()) {
-      outLines.push(line);
+      if (inCue && !currentCueHasText && currentTimingIdx === outLines.length - 1) {
+        outLines.pop();
+      } else {
+        outLines.push('');
+      }
       inCue = false;
       currentTimingIdx = -1;
+      currentCueHasText = false;
       continue;
     }
 
@@ -247,11 +262,22 @@ function sanitizeAndEnhanceVtt(vttPath) {
       text = text.replace(/\{\\b1\}/gi, '<b>').replace(/\{\\b0\}/gi, '</b>');
       text = text.replace(/\{\\i1\}/gi, '<i>').replace(/\{\\i0\}/gi, '</i>');
       text = text.replace(/\{\\u1\}/gi, '<u>').replace(/\{\\u0\}/gi, '</u>');
-      text = text.replace(/\{[^}]*\}/g, '').trim();
-      outLines.push(text);
+      text = text.replace(/\{[^}]*\}/g, '').replace(/-->/g, '->');
+      const subLines = text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+      if (subLines.length > 0) {
+        outLines.push(subLines.join('\n'));
+        currentCueHasText = true;
+      }
     } else {
       outLines.push(line);
     }
+  }
+
+  if (inCue && !currentCueHasText && currentTimingIdx === outLines.length - 1) {
+    outLines.pop();
   }
 
   fs.writeFileSync(vttPath, outLines.join('\n'), 'utf8');
@@ -264,23 +290,13 @@ function probeSubtitleStreams(videoPath) {
   try {
     out = execFileSync('ffprobe', [
       '-v', 'error',
-      '-show_entries', 'stream=index,codec_type,codec_name:stream_tags=language,title',
+      '-show_streams',
       '-of', 'json',
       videoPath,
     ], { encoding: 'utf8', timeout: 30000 }).trim();
   } catch (err) {
-    console.warn(`ffprobe stream_tags probe failed for ${videoPath}, falling back to general tags:`, err.message);
-    try {
-      out = execFileSync('ffprobe', [
-        '-v', 'error',
-        '-show_entries', 'stream=index,codec_type,codec_name,tags',
-        '-of', 'json',
-        videoPath,
-      ], { encoding: 'utf8', timeout: 30000 }).trim();
-    } catch (err2) {
-      console.error(`ffprobe fallback probe failed for ${videoPath}:`, err2.message);
-      return [];
-    }
+    console.error(`ffprobe failed for ${videoPath}:`, err.message);
+    return [];
   }
   if (!out) return [];
 
@@ -291,13 +307,14 @@ function probeSubtitleStreams(videoPath) {
   const subs = [];
   for (const s of parsed.streams) {
     if (s.codec_type !== 'subtitle') continue;
-    const lang = (s.tags && s.tags.language) || s.language || '';
-    const title = (s.tags && s.tags.title) || '';
+    const tags = s.tags || {};
+    const lang = tags.language || tags.LANGUAGE || s.language || '';
+    const title = tags.title || tags.TITLE || '';
     subs.push({
       index: s.index,
       codec: s.codec_name || '',
-      language: lang.trim(),
-      title: title.trim(),
+      language: String(lang).trim(),
+      title: String(title).trim(),
     });
   }
   return subs;
@@ -328,7 +345,7 @@ function extractSubtitleToVtt(videoPath, streamIndex, outDir, codec) {
         const assContent = fs.readFileSync(assPath, 'utf8');
         try { fs.unlinkSync(assPath); } catch (_) {}
         const vttContent = convertAssToVtt(assContent);
-        if (vttContent && vttContent.length > 20) {
+        if (vttContent && vttContent.includes('-->')) {
           fs.writeFileSync(vttPath, vttContent, 'utf8');
           return vttPath;
         }

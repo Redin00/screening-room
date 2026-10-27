@@ -346,6 +346,11 @@ function broadcastMembers(code) {
 // Called by the upload route after a video is saved. Tells every client in the room
 // that a new video is available so they can reload without a manual refresh.
 function notifyVideoChange(code, videoName) {
+  const state = rooms.get(code);
+  if (state) {
+    state.lastState = { playing: false, time: 0, updatedAt: Date.now() };
+    state.subtitleIndex = null;
+  }
   if (!io) return;
   io.to(code).emit('room:video', { videoName });
 }
@@ -353,6 +358,10 @@ function notifyVideoChange(code, videoName) {
 // Called after subtitle extraction. Pushes the track list to all clients so they
 // can rebuild <track> elements without waiting for a separate GET request.
 function notifySubtitleChange(code, tracks) {
+  const state = rooms.get(code);
+  if (state) {
+    state.subtitleIndex = (tracks && tracks.length > 0) ? tracks[0].index : null;
+  }
   if (!io) return;
   io.to(code).emit('room:subtitles', { tracks });
 }
