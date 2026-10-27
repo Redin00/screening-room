@@ -1,5 +1,4 @@
 const db = require('../db');
-const scheduler = require('../cleanup/scheduler');
 
 // In-memory presence per room code. Purely runtime state — never persisted —
 // so a restart just means clients re-announce themselves on reconnect.
@@ -52,10 +51,12 @@ function attach(_io) {
       socket.join(code);
       const state = getRoomState(code);
       const isHost = room.host_id === profile.id;
+      const isAdmin = !!profile.is_admin;
 
       socket.data.roomCode = code;
       socket.data.roomId = room.id;
       socket.data.isHost = isHost;
+      socket.data.isAdmin = isAdmin;
 
       // Persist profile id on the socket so control-list ops survive reconnects
       // (socket ids change on reconnect but profile ids do not).
@@ -65,39 +66,39 @@ function attach(_io) {
 
       // Track members as a Map so we can broadcast member lists with names.
       // On reconnect the socket id changes; remove any stale entry for this
-      // profile first so the viewer count stays correct. Also keep the DB
-      // viewer_count and last_empty_at in sync so the sweeper can act across
-      // restarts.
+      // profile first so the viewer count stays correct.
       state.members.forEach((info, socketId) => {
         if (info.profileId === profile.id) {
           state.members.delete(socketId);
-          if (room.id) {
-            db.prepare(`UPDATE rooms SET viewer_count = viewer_count - 1 WHERE id = ? AND viewer_count > 0`).run(room.id);
-          }
         }
       });
-      state.members.set(socket.id, { profileId: profile.id, displayName: profile.display_name, avatarColor: profile.avatar_color });
+      state.members.set(socket.id, {
+        profileId: profile.id,
+        displayName: profile.display_name,
+        avatarColor: profile.avatar_color,
+        isAdmin,
+        isHost,
+      });
       if (room.id) {
-        const cur = db.prepare('SELECT viewer_count FROM rooms WHERE id = ?').get(room.id);
-        if (cur && cur.viewer_count === 0) {
-          db.prepare(`UPDATE rooms SET viewer_count = 1, last_empty_at = NULL WHERE id = ?`).run(room.id);
-        } else if (cur && cur.viewer_count > 0) {
-          db.prepare(`UPDATE rooms SET viewer_count = viewer_count + 1 WHERE id = ?`).run(room.id);
-        }
+        const count = state.members.size;
+        db.prepare(`UPDATE rooms SET viewer_count = ?, last_empty_at = NULL WHERE id = ?`).run(count, room.id);
       }
 
-      if (isHost) {
-        state.hostSocketId = socket.id;
-        // Host is always implicitly in both permission lists.
+      if (isHost || isAdmin) {
+        if (isHost) {
+          state.hostSocketId = socket.id;
+          db.prepare(`UPDATE rooms SET host_last_seen = datetime('now') WHERE id = ?`).run(room.id);
+        }
+        // Host and Admins are always implicitly in both permission lists.
         state.controlList.add(profile.id);
         state.uploadList.add(profile.id);
-        db.prepare(`UPDATE rooms SET host_last_seen = datetime('now') WHERE id = ?`).run(room.id);
       }
 
       // Send permission lists and member list to the newcomer so they know
       // what they can do and who else is here.
       socket.emit('room:joined', {
         isHost,
+        isAdmin,
         profileId: profile.id,
         displayName: profile.display_name,
         viewerCount: memberCount(code),
@@ -141,7 +142,7 @@ function attach(_io) {
       // Play/pause/seek require authorization.
       if (type !== 'play' && type !== 'pause' && type !== 'seek') return;
 
-      const isAuthorized = socket.data.isHost || state.controlList.has(socket.data.profileId);
+      const isAuthorized = socket.data.isHost || socket.data.isAdmin || state.controlList.has(socket.data.profileId);
       if (!isAuthorized) {
         socket.emit('room:command-denied', {
           type,
@@ -188,7 +189,7 @@ function attach(_io) {
     socket.on('room:subtitle', ({ index }) => {
       if (!socket.data.roomCode) return;
       const state = getRoomState(socket.data.roomCode);
-      const isAuthorized = socket.data.isHost || state.controlList.has(socket.data.profileId);
+      const isAuthorized = socket.data.isHost || socket.data.isAdmin || state.controlList.has(socket.data.profileId);
       if (!isAuthorized) {
         socket.emit('room:command-denied', {
           type: 'subtitle',
@@ -225,13 +226,13 @@ function attach(_io) {
       }, 2000);
       syncRequestTimers.set(requesterSocketId, { timer, requesterId });
 
-      // Route to the host if present, otherwise to any authorized controller.
+      // Route to the host if present, otherwise to any authorized controller (admin or controlList).
       let targetSocketId = null;
       if (state.hostSocketId) {
         targetSocketId = state.hostSocketId;
       } else {
         state.members.forEach((info, sid) => {
-          if (sid !== requesterSocketId && (info.profileId === socket.data.profileId || state.controlList.has(info.profileId))) {
+          if (sid !== requesterSocketId && (info.isAdmin || state.controlList.has(info.profileId))) {
             targetSocketId = sid;
           }
         });
@@ -247,12 +248,12 @@ function attach(_io) {
     socket.on('room:sync-response', ({ requesterId, playing, time, subtitleIndex }) => {
       if (!socket.data.roomCode) return;
       const state = getRoomState(socket.data.roomCode);
-      const isAuthorized = socket.data.isHost || state.controlList.has(socket.data.profileId);
+      const isAuthorized = socket.data.isHost || socket.data.isAdmin || state.controlList.has(socket.data.profileId);
       if (!isAuthorized) return;
       io.to(requesterId).emit('room:command', { type: 'sync', data: { playing: !!playing, time: Number(time) || 0, subtitleIndex: subtitleIndex != null ? subtitleIndex : null, updatedAt: Date.now() } });
     });
 
-    // --- Permission list management (host only can remove; anyone in the room can self-add) ---
+    // --- Permission list management (host and admin can manage; viewers may self-add) ---
 
     socket.on('room:control-list-update', ({ action, list, profileId }) => {
       if (!socket.data.roomCode) return;
@@ -260,15 +261,24 @@ function attach(_io) {
       if (list !== 'control' && list !== 'upload') return;
       const state = getRoomState(socket.data.roomCode);
       const target = list === 'control' ? state.controlList : state.uploadList;
+      const isHostOrAdmin = socket.data.isHost || socket.data.isAdmin;
+
       if (action === 'add') {
-        // Self-add: a viewer may add their own profile to either list; the host may add anyone.
-        if (profileId !== socket.data.profileId && !socket.data.isHost) return;
+        // Self-add: a viewer may add their own profile to either list; host or admin may add anyone.
+        if (profileId !== socket.data.profileId && !isHostOrAdmin) return;
         target.add(profileId);
       } else {
-        // Remove: only the host may remove someone from either list.
-        if (!socket.data.isHost) return;
-        // Host can't remove themselves.
+        // Remove: only the host or admin may remove someone from either list.
+        if (!isHostOrAdmin) return;
+        // Cannot remove self if host or admin
         if (profileId === socket.data.profileId) return;
+        // Host can't be removed
+        const room = db.prepare('SELECT host_id FROM rooms WHERE code = ?').get(socket.data.roomCode);
+        if (room && room.host_id === profileId) return;
+        // Admins can't be removed
+        const targetProf = db.prepare('SELECT is_admin FROM profiles WHERE id = ?').get(profileId);
+        if (targetProf && targetProf.is_admin) return;
+
         target.delete(profileId);
       }
       io.to(socket.data.roomCode).emit('room:control-list', {
@@ -292,13 +302,11 @@ function attach(_io) {
         }
         state.members.delete(socket.id);
         if (socket.data.roomId) {
-          const cur = db.prepare('SELECT viewer_count FROM rooms WHERE id = ?').get(socket.data.roomId);
-          if (cur && cur.viewer_count > 0) {
-            db.prepare(`UPDATE rooms SET viewer_count = viewer_count - 1 WHERE id = ?`).run(socket.data.roomId);
-            const newCur = db.prepare('SELECT viewer_count FROM rooms WHERE id = ?').get(socket.data.roomId);
-            if (newCur && newCur.viewer_count === 0) {
-              db.prepare(`UPDATE rooms SET last_empty_at = datetime('now') WHERE id = ?`).run(socket.data.roomId);
-            }
+          const count = state.members.size;
+          if (count === 0) {
+            db.prepare(`UPDATE rooms SET viewer_count = 0, last_empty_at = datetime('now') WHERE id = ?`).run(socket.data.roomId);
+          } else {
+            db.prepare(`UPDATE rooms SET viewer_count = ? WHERE id = ?`).run(count, socket.data.roomId);
           }
         }
         if (!state.hostSocketId && state.members.size === 0) rooms.delete(joinedCode);
@@ -349,4 +357,12 @@ function notifySubtitleChange(code, tracks) {
   io.to(code).emit('room:subtitles', { tracks });
 }
 
-module.exports = { attach, getRoomState, notifyVideoChange, notifySubtitleChange };
+// Called when a room is ended or auto-closed. Informs all connected clients
+// so they are cleanly redirected back to the lobby instead of being stuck.
+function notifyRoomEnded(code) {
+  if (!io) return;
+  io.to(code).emit('room:ended', { message: 'The screening has ended.' });
+  rooms.delete(code);
+}
+
+module.exports = { attach, getRoomState, notifyVideoChange, notifySubtitleChange, notifyRoomEnded };

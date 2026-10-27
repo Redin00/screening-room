@@ -3,21 +3,271 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 
+// Convert ASS timestamp (H:MM:SS.cs) to WebVTT timestamp (HH:MM:SS.mmm).
+function assTimeToVtt(t) {
+  if (!t) return '00:00:00.000';
+  const parts = t.trim().split(':');
+  if (parts.length < 2) return '00:00:00.000';
+  let h = '00', m = '00', s = '00', ms = '000';
+  if (parts.length === 3) {
+    h = parts[0].padStart(2, '0');
+    m = parts[1].padStart(2, '0');
+    const sParts = parts[2].split('.');
+    s = sParts[0].padStart(2, '0');
+    ms = (sParts[1] || '0').padEnd(3, '0').slice(0, 3);
+  } else if (parts.length === 2) {
+    m = parts[0].padStart(2, '0');
+    const sParts = parts[1].split('.');
+    s = sParts[0].padStart(2, '0');
+    ms = (sParts[1] || '0').padEnd(3, '0').slice(0, 3);
+  }
+  return `${h}:${m}:${s}.${ms}`;
+}
+
+// Convert ASS/SSA script content to WebVTT preserving positions, alignments,
+// and styling tags without ffmpeg's lossy flattening.
+function convertAssToVtt(assContent) {
+  let playResX = 1920;
+  let playResY = 1080;
+  const styles = {};
+
+  const lines = assContent.split(/\r?\n/);
+  let section = '';
+  const events = [];
+  let eventFormat = [];
+
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith(';')) continue;
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      section = trimmed.slice(1, -1).trim();
+      continue;
+    }
+
+    if (section === 'Script Info') {
+      const matchX = trimmed.match(/^PlayResX\s*:\s*(\d+)/i);
+      if (matchX) playResX = parseInt(matchX[1], 10);
+      const matchY = trimmed.match(/^PlayResY\s*:\s*(\d+)/i);
+      if (matchY) playResY = parseInt(matchY[1], 10);
+    } else if (section === 'V4+ Styles' || section === 'V4 Styles') {
+      if (trimmed.startsWith('Format:')) {
+        styleFormat = trimmed.substring(7).split(',').map((s) => s.trim().toLowerCase());
+      } else if (trimmed.startsWith('Style:')) {
+        const parts = trimmed.substring(6).split(',').map((s) => s.trim());
+        const styleName = parts[0];
+        let align = 2;
+        const alignIdx = styleFormat.indexOf('alignment');
+        if (alignIdx !== -1 && parts[alignIdx] != null) {
+          align = parseInt(parts[alignIdx], 10) || 2;
+        } else if (parts.length >= 19) {
+          align = parseInt(parts[18], 10) || 2;
+        } else if (parts.length >= 14) {
+          align = parseInt(parts[parts.length - 5], 10) || 2;
+        }
+
+        // Handle legacy SSA alignment (section === 'V4 Styles')
+        if (section === 'V4 Styles') {
+          if (align === 6) align = 8;
+          else if (align === 5) align = 7;
+          else if (align === 7) align = 9;
+          else if (align === 9) align = 4;
+          else if (align === 10) align = 5;
+          else if (align === 11) align = 6;
+        }
+
+        styles[styleName] = { alignment: align };
+      }
+    } else if (section === 'Events') {
+      if (trimmed.startsWith('Format:')) {
+        eventFormat = trimmed.substring(7).split(',').map((s) => s.trim().toLowerCase());
+      } else if (trimmed.startsWith('Dialogue:')) {
+        const firstColon = trimmed.indexOf(':');
+        const rest = trimmed.substring(firstColon + 1).trim();
+        const numFields = eventFormat.length > 0 ? eventFormat.length : 10;
+        const parts = [];
+        let cur = '';
+        let count = 0;
+        for (let i = 0; i < rest.length; i++) {
+          if (rest[i] === ',' && count < numFields - 1) {
+            parts.push(cur.trim());
+            cur = '';
+            count++;
+          } else {
+            cur += rest[i];
+          }
+        }
+        parts.push(cur);
+
+        const startIndex = eventFormat.indexOf('start') !== -1 ? eventFormat.indexOf('start') : 1;
+        const endIndex = eventFormat.indexOf('end') !== -1 ? eventFormat.indexOf('end') : 2;
+        const styleIndex = eventFormat.indexOf('style') !== -1 ? eventFormat.indexOf('style') : 3;
+
+        events.push({
+          start: parts[startIndex] || '',
+          end: parts[endIndex] || '',
+          style: parts[styleIndex] || 'Default',
+          rawText: parts[parts.length - 1] || '',
+        });
+      }
+    }
+  }
+
+  let vtt = 'WEBVTT\n\n';
+  for (const ev of events) {
+    if (/\{\\p[1-9]\}/.test(ev.rawText)) continue; // Skip vector drawing commands
+
+    const startVtt = assTimeToVtt(ev.start);
+    const endVtt = assTimeToVtt(ev.end);
+    let text = ev.rawText;
+
+    const styleInfo = styles[ev.style] || { alignment: 2 };
+    let alignNum = styleInfo.alignment || 2;
+
+    const anMatch = text.match(/\\an(\d)/);
+    if (anMatch) {
+      alignNum = parseInt(anMatch[1], 10);
+    }
+
+    const posMatch = text.match(/\\pos\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)/);
+    let cueSettings = '';
+
+    if (posMatch) {
+      const px = parseFloat(posMatch[1]);
+      const py = parseFloat(posMatch[2]);
+      const xPct = Math.max(0, Math.min(100, (px / playResX) * 100)).toFixed(1);
+      const yPct = Math.max(0, Math.min(100, (py / playResY) * 100)).toFixed(1);
+      cueSettings = `line:${yPct}% position:${xPct}% align:center`;
+    } else if (alignNum !== 2) {
+      // Non-standard alignment (top, mid, or left/right)
+      let linePct = '88%';
+      let posPct = '50%';
+      let align = 'center';
+
+      if (alignNum >= 7 && alignNum <= 9) {
+        linePct = '8%';
+      } else if (alignNum >= 4 && alignNum <= 6) {
+        linePct = '50%';
+      } else {
+        linePct = '90%';
+      }
+
+      if (alignNum === 7 || alignNum === 4 || alignNum === 1) {
+        posPct = '10%';
+        align = 'left';
+      } else if (alignNum === 9 || alignNum === 6 || alignNum === 3) {
+        posPct = '90%';
+        align = 'right';
+      } else {
+        posPct = '50%';
+        align = 'center';
+      }
+
+      cueSettings = `line:${linePct} position:${posPct} align:${align}`;
+    }
+    // Note: if alignNum === 2 (standard bottom dialogue), cueSettings is empty,
+    // allowing native WebVTT layout to handle automatic line stacking without collision!
+
+    text = text.replace(/\\N/g, '\n').replace(/\\n/g, '\n');
+    text = text.replace(/\{\\b1\}/gi, '<b>').replace(/\{\\b0\}/gi, '</b>');
+    text = text.replace(/\{\\i1\}/gi, '<i>').replace(/\{\\i0\}/gi, '</i>');
+    text = text.replace(/\{\\u1\}/gi, '<u>').replace(/\{\\u0\}/gi, '</u>');
+    // Remove all remaining ASS override tags like {\...}
+    text = text.replace(/\{[^}]*\}/g, '');
+    text = text.trim();
+
+    if (!text) continue;
+    vtt += `${startVtt} --> ${endVtt}${cueSettings ? ' ' + cueSettings : ''}\n${text}\n\n`;
+  }
+  return vtt;
+}
+
+// Sanitize WebVTT files generated from SRT or ffmpeg conversions to parse
+// positioning tags (e.g. {\an8}, { n8}, {\pos(X,Y)}) and eliminate raw bracket tags.
+function sanitizeAndEnhanceVtt(vttPath) {
+  if (!fs.existsSync(vttPath)) return;
+  const content = fs.readFileSync(vttPath, 'utf8');
+  const lines = content.split(/\r?\n/);
+  const outLines = [];
+  let inCue = false;
+  let currentTimingIdx = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.includes('-->')) {
+      outLines.push(line);
+      currentTimingIdx = outLines.length - 1;
+      inCue = true;
+      continue;
+    }
+    if (!line.trim()) {
+      outLines.push(line);
+      inCue = false;
+      currentTimingIdx = -1;
+      continue;
+    }
+
+    if (inCue && currentTimingIdx !== -1) {
+      let text = line;
+      const anMatch = text.match(/(?:\{\\an(\d)\}|\{\s*n(\d)\})/);
+      let posSettings = '';
+      if (anMatch) {
+        const alignNum = parseInt(anMatch[1] || anMatch[2], 10);
+        if (alignNum !== 2) {
+          let linePct = '90%';
+          let posPct = '50%';
+          let align = 'center';
+          if (alignNum >= 7 && alignNum <= 9) linePct = '8%';
+          else if (alignNum >= 4 && alignNum <= 6) linePct = '50%';
+          else linePct = '90%';
+
+          if (alignNum === 7 || alignNum === 4 || alignNum === 1) {
+            posPct = '10%'; align = 'left';
+          } else if (alignNum === 9 || alignNum === 6 || alignNum === 3) {
+            posPct = '90%'; align = 'right';
+          }
+          posSettings = `line:${linePct} position:${posPct} align:${align}`;
+        }
+      }
+
+      const posMatch = text.match(/\{\\pos\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)\}/);
+      if (posMatch) {
+        const x = parseFloat(posMatch[1]);
+        const y = parseFloat(posMatch[2]);
+        const xPct = Math.max(0, Math.min(100, (x / 1920) * 100)).toFixed(1);
+        const yPct = Math.max(0, Math.min(100, (y / 1080) * 100)).toFixed(1);
+        posSettings = `line:${yPct}% position:${xPct}% align:center`;
+      }
+
+      if (posSettings && !outLines[currentTimingIdx].includes('line:')) {
+        outLines[currentTimingIdx] = `${outLines[currentTimingIdx].trim()} ${posSettings}`;
+      }
+
+      text = text.replace(/\\N/g, '\n').replace(/\\n/g, '\n');
+      text = text.replace(/\{\\b1\}/gi, '<b>').replace(/\{\\b0\}/gi, '</b>');
+      text = text.replace(/\{\\i1\}/gi, '<i>').replace(/\{\\i0\}/gi, '</i>');
+      text = text.replace(/\{\\u1\}/gi, '<u>').replace(/\{\\u0\}/gi, '</u>');
+      text = text.replace(/\{[^}]*\}/g, '').trim();
+      outLines.push(text);
+    } else {
+      outLines.push(line);
+    }
+  }
+
+  fs.writeFileSync(vttPath, outLines.join('\n'), 'utf8');
+}
+
 // Probe a video file for embedded subtitle streams.
-// Returns an array of { index, codec, language } for each subtitle track.
-// Uses JSON output (not CSV) so column ordering is unambiguous across ffprobe
-// versions — older/newer builds may emit CSV columns in different orders.
+// Returns an array of { index, codec, language, title } for each subtitle track.
 function probeSubtitleStreams(videoPath) {
   let out;
   try {
     out = execFileSync('ffprobe', [
       '-v', 'error',
-      '-show_entries', 'stream=index,codec_type,codec_name,language',
+      '-show_entries', 'stream=index,codec_type,codec_name:stream_tags=language,title',
       '-of', 'json',
       videoPath,
     ], { encoding: 'utf8', timeout: 30000 }).trim();
   } catch (err) {
-    // ffprobe failed — treat as no subs.
     return [];
   }
   if (!out) return [];
@@ -29,26 +279,52 @@ function probeSubtitleStreams(videoPath) {
   const subs = [];
   for (const s of parsed.streams) {
     if (s.codec_type !== 'subtitle') continue;
+    const lang = (s.tags && s.tags.language) || s.language || '';
+    const title = (s.tags && s.tags.title) || '';
     subs.push({
       index: s.index,
       codec: s.codec_name || '',
-      language: (s.language || '').trim() || '',
+      language: lang.trim(),
+      title: title.trim(),
     });
   }
   return subs;
 }
 
 // Extract a single subtitle stream to a WebVTT file alongside the video.
-// Returns the absolute VTT path, or throws.
-function extractSubtitleToVtt(videoPath, streamIndex, outDir) {
+// If the stream is ASS/SSA, attempts lossless copy and exact WebVTT generation
+// to preserve positioning tags, sign placements, and alignments.
+function extractSubtitleToVtt(videoPath, streamIndex, outDir, codec) {
   const base = path.basename(videoPath, path.extname(videoPath));
   const vttName = `${base}.s${streamIndex}.vtt`;
   const vttPath = path.join(outDir, vttName);
-  // Use -map 0:s:N to pull just this subtitle stream (N = subtitle-stream
-  // index, i.e. 0-based position within the subtitle streams only), and
-  // transcode to WebVTT. The overall stream index (e.g. 2 for an MKV with
-  // video=0, audio=1, subs=2) must NOT be used here — 0:s:2 would look for
-  // the third subtitle stream, not the stream at overall position 2.
+
+  const isAss = codec === 'ass' || codec === 'ssa';
+  if (isAss) {
+    const assName = `${base}.s${streamIndex}.ass`;
+    const assPath = path.join(outDir, assName);
+    try {
+      execFileSync('ffmpeg', [
+        '-y',
+        '-i', videoPath,
+        '-map', `0:s:${streamIndex}`,
+        '-c:s', 'copy',
+        assPath,
+      ], { encoding: 'utf8', timeout: 120000, stdio: 'pipe' });
+
+      if (fs.existsSync(assPath)) {
+        const assContent = fs.readFileSync(assPath, 'utf8');
+        const vttContent = convertAssToVtt(assContent);
+        fs.writeFileSync(vttPath, vttContent, 'utf8');
+        try { fs.unlinkSync(assPath); } catch (_) {}
+        return vttPath;
+      }
+    } catch (err) {
+      console.warn(`ASS lossless extraction failed for stream ${streamIndex}, falling back to ffmpeg webvtt:`, err.message);
+    }
+  }
+
+  // Fallback or non-ASS subtitle streams
   execFileSync('ffmpeg', [
     '-y',
     '-i', videoPath,
@@ -56,9 +332,18 @@ function extractSubtitleToVtt(videoPath, streamIndex, outDir) {
     '-c:s', 'webvtt',
     vttPath,
   ], { encoding: 'utf8', timeout: 120000, stdio: 'pipe' });
+
   if (!fs.existsSync(vttPath)) {
     throw new Error(`ffmpeg did not produce ${vttName}`);
   }
+
+  // Clean and sanitize any formatting/positioning tags
+  try {
+    sanitizeAndEnhanceVtt(vttPath);
+  } catch (err) {
+    console.warn(`sanitizeAndEnhanceVtt warning: ${err.message}`);
+  }
+
   return vttPath;
 }
 
@@ -74,7 +359,7 @@ function mapLanguageCode(code) {
     rus: 'ru', pol: 'pl', swe: 'sv', fin: 'fi',
     nor: 'no', tur: 'tr', heb: 'he', ara: 'ar',
     cat: 'ca', glg: 'gl', afr: 'af', vie: 'vi',
-    tha: 'th', ind: 'id', msa: 'ms', fil: 'fil',
+    th: 'th', ind: 'id', msa: 'ms', fil: 'fil',
     por: 'pt', pt_br: 'pt-BR', pt_pt: 'pt-PT',
     ces: 'cs', cze: 'cs', slk: 'sk', slv: 'sl',
     est: 'et', lav: 'lv', lit: 'lt',
@@ -108,9 +393,18 @@ function langLabel(langCode) {
 function labelForTrack(streams, s, subIndex) {
   const lang = mapLanguageCode(s.language);
   const langName = langLabel(lang);
+  let baseLabel = '';
+
+  if (s.title) {
+    baseLabel = s.title;
+    if (langName && !s.title.toLowerCase().includes(langName.toLowerCase())) {
+      return `${s.title} (${langName})`;
+    }
+    return baseLabel;
+  }
+
   if (langName && langName !== lang.toUpperCase()) return langName;
   if (lang && lang.toUpperCase() !== lang) return lang.toUpperCase();
-  // Fallback: Subtitle N (1-based, by subtitle-stream order).
   return `Subtitle ${subIndex + 1}`;
 }
 
@@ -119,19 +413,18 @@ function labelForTrack(streams, s, subIndex) {
 function extractAndPersistSubtitles(videoPath, roomId) {
   const streams = probeSubtitleStreams(videoPath);
   if (streams.length === 0) {
-    // Clear any previously stored subtitle metadata for this room.
     db.prepare('UPDATE rooms SET subtitles = NULL WHERE id = ?').run(roomId);
     return [];
   }
 
   const outDir = path.dirname(videoPath);
   const tracks = [];
-  let subIndex = 0; // 0-based index within the subtitle streams (for -map 0:s:N)
+  let subIndex = 0;
 
   for (const s of streams) {
     let vttPath;
     try {
-      vttPath = extractSubtitleToVtt(videoPath, subIndex, outDir);
+      vttPath = extractSubtitleToVtt(videoPath, subIndex, outDir, s.codec);
     } catch (err) {
       console.error(`Failed to extract subtitle stream ${s.index} for room ${roomId}:`, err.message);
       subIndex++;
@@ -141,7 +434,7 @@ function extractAndPersistSubtitles(videoPath, roomId) {
     const label = labelForTrack(streams, s, subIndex);
     tracks.push({
       index: s.index,
-      subIndex, // 0-based subtitle-stream index (for VTT file naming)
+      subIndex,
       srclang: lang,
       label,
       vttPath,
@@ -161,4 +454,11 @@ function extractAndPersistSubtitles(videoPath, roomId) {
   return tracks;
 }
 
-module.exports = { probeSubtitleStreams, extractSubtitleToVtt, extractAndPersistSubtitles };
+module.exports = {
+  probeSubtitleStreams,
+  convertAssToVtt,
+  sanitizeAndEnhanceVtt,
+  extractSubtitleToVtt,
+  extractAndPersistSubtitles,
+};
+

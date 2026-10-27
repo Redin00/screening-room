@@ -44,21 +44,21 @@ function loadRoom(req, res, next) {
 }
 
 function requireIsHost(req, res, next) {
-  if (req.room.host_id !== req.profile.id) {
-    return res.status(403).json({ error: 'Only the host can do that.' });
+  if (req.room.host_id !== req.profile.id && !req.profile.is_admin) {
+    return res.status(403).json({ error: 'Only the host or an administrator can do that.' });
   }
   next();
 }
 
 function requireCanUpload(req, res, next) {
-  if (req.room.host_id === req.profile.id) return next();
+  if (req.profile.is_admin || req.room.host_id === req.profile.id) return next();
   const roomState = roomSocket.getRoomState(req.params.code);
   if (roomState && roomState.uploadList && roomState.uploadList.has(req.profile.id)) return next();
   return res.status(403).json({ error: 'You are not authorized to upload in this room.' });
 }
 
 function requireCanControl(req, res, next) {
-  if (req.room.host_id === req.profile.id) return next();
+  if (req.profile.is_admin || req.room.host_id === req.profile.id) return next();
   const roomState = roomSocket.getRoomState(req.params.code);
   if (roomState && roomState.controlList && roomState.controlList.has(req.profile.id)) return next();
   return res.status(403).json({ error: 'You are not authorized to control playback in this room.' });
@@ -66,11 +66,14 @@ function requireCanControl(req, res, next) {
 
 // Rooms still open, for a lightweight "join a room" browser.
 router.get('/', (req, res) => {
+  const where = req.profile && req.profile.is_admin
+    ? `WHERE rooms.status != 'closed'`
+    : `WHERE rooms.status != 'closed' AND rooms.private = 0`;
   const rows = db
     .prepare(
       `SELECT rooms.*, profiles.display_name AS host_name
        FROM rooms JOIN profiles ON profiles.id = rooms.host_id
-       WHERE rooms.status != 'closed' AND rooms.private = 0
+       ${where}
        ORDER BY rooms.created_at DESC`
     )
     .all();
@@ -101,9 +104,20 @@ router.post('/:code/upload', loadRoom, requireCanUpload, (req, res) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'No video file received.' });
 
-    // Replace any previous file for this room immediately.
-    if (req.room.video_path && fs.existsSync(req.room.video_path) && req.room.video_path !== req.file.path) {
-      fs.unlink(req.room.video_path, () => {});
+    // Clean up any previous video and subtitle files in this room directory
+    const dir = scheduler.roomDir(req.room.id);
+    if (fs.existsSync(dir)) {
+      try {
+        const files = fs.readdirSync(dir);
+        for (const f of files) {
+          const fullPath = path.join(dir, f);
+          if (fullPath !== req.file.path && fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+          }
+        }
+      } catch (err) {
+        console.error('Error cleaning previous files in roomDir:', err.message);
+      }
     }
     scheduler.cancelScheduledDeletion(req.room.id);
 

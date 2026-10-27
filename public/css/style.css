@@ -25,17 +25,23 @@
 }
 
 * { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: inherit; }
 
-html, body {
+html {
+  box-sizing: border-box;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
   margin: 0;
   padding: 0;
   background: var(--ink);
   color: var(--screen);
   font-family: var(--sans);
   min-height: 100vh;
-}
-
-body {
+  overflow-x: hidden;
+  max-width: 100vw;
   background-image:
     radial-gradient(ellipse 900px 500px at 50% -10%, rgba(232, 163, 61, 0.09), transparent 60%);
   background-attachment: fixed;
@@ -415,6 +421,7 @@ label {
 }
 
 .screen-wrap {
+  position: relative;
   flex: 1;
   display: flex;
   align-items: center;
@@ -430,17 +437,161 @@ label {
   border-radius: 2px;
 }
 
-/* Remove the browser's default dark background box behind captions/subtitles */
-.screen-wrap video::cue {
-  background: rgba(0, 0, 0, 0.55);
-  color: var(--screen);
-  /* Fallback thin black stroke for renderers that honour it (Chrome/Edge);
-     the semi-transparent background is the primary readability aid. */
-  -webkit-text-stroke: 1px #000;
-  text-stroke: 1px #000;
-  /* Push cues a little higher in the frame on browsers that honour
-     vertical-align inside ::cue (webkit). Safe no-op for others. */
-  vertical-align: 12%;
+/* Crunchyroll Subtitle Styling for WebVTT ::cue in normal & fullscreen */
+::cue,
+video::cue,
+*::cue {
+  font-family: var(--sub-font-family, "Trebuchet MS", "Lucida Sans Unicode", -apple-system, sans-serif);
+  font-weight: 700;
+  color: var(--sub-color, #ffffff);
+  background-color: var(--sub-bg, transparent);
+  text-shadow: var(--sub-text-shadow,
+    -2px -2px 0 #000,
+     2px -2px 0 #000,
+    -2px  2px 0 #000,
+     2px  2px 0 #000,
+    -2px  0px 0 #000,
+     2px  0px 0 #000,
+     0px -2px 0 #000,
+     0px  2px 0 #000,
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000);
+  font-size: 26px;
+  line-height: 1.35;
+  white-space: pre-line;
+}
+
+/* Fullscreen Subtitles - Standard */
+:fullscreen::cue,
+video:fullscreen::cue,
+.screen-wrap:fullscreen video::cue,
+:fullscreen video::cue {
+  font-size: 60px;
+  text-shadow: var(--sub-fullscreen-shadow,
+    -3.5px -3.5px 0 #000,
+     3.5px -3.5px 0 #000,
+    -3.5px  3.5px 0 #000,
+     3.5px  3.5px 0 #000,
+    -3.5px  0px 0 #000,
+     3.5px  0px 0 #000,
+     0px -3.5px 0 #000,
+     0px  3.5px 0 #000,
+    -2.5px -2.5px 0 #000,
+     2.5px -2.5px 0 #000,
+    -2.5px  2.5px 0 #000,
+     2.5px  2.5px 0 #000,
+     0px  0px 6px rgba(0, 0, 0, 0.95));
+}
+
+/* Fullscreen Subtitles - Firefox Gecko */
+:-moz-full-screen::cue,
+video:-moz-full-screen::cue,
+.screen-wrap:-moz-full-screen video::cue,
+:-moz-full-screen video::cue {
+  font-size: 60px;
+  text-shadow: var(--sub-fullscreen-shadow,
+    -3.5px -3.5px 0 #000,
+     3.5px -3.5px 0 #000,
+    -3.5px  3.5px 0 #000,
+     3.5px  3.5px 0 #000,
+    -3.5px  0px 0 #000,
+     3.5px  0px 0 #000,
+     0px -3.5px 0 #000,
+     0px  3.5px 0 #000,
+    -2.5px -2.5px 0 #000,
+     2.5px -2.5px 0 #000,
+    -2.5px  2.5px 0 #000,
+     2.5px  2.5px 0 #000,
+     0px  0px 6px rgba(0, 0, 0, 0.95));
+}
+
+/* Fullscreen Subtitles - WebKit & Blink */
+:-webkit-full-screen::cue,
+video:-webkit-full-screen::cue,
+.screen-wrap:-webkit-full-screen video::cue,
+:-webkit-full-screen video::cue {
+  font-size: 60px;
+  text-shadow: var(--sub-fullscreen-shadow,
+    -3.5px -3.5px 0 #000,
+     3.5px -3.5px 0 #000,
+    -3.5px  3.5px 0 #000,
+     3.5px  3.5px 0 #000,
+    -3.5px  0px 0 #000,
+     3.5px  0px 0 #000,
+     0px -3.5px 0 #000,
+     0px  3.5px 0 #000,
+    -2.5px -2.5px 0 #000,
+     2.5px -2.5px 0 #000,
+    -2.5px  2.5px 0 #000,
+     2.5px  2.5px 0 #000,
+     0px  0px 6px rgba(0, 0, 0, 0.95));
+}
+
+/* Fullscreen Subtitles - Forgiving :is() selector */
+:is(:fullscreen, :-webkit-full-screen, :-moz-full-screen)::cue,
+video:is(:fullscreen, :-webkit-full-screen, :-moz-full-screen)::cue,
+:is(:fullscreen, :-webkit-full-screen, :-moz-full-screen) video::cue {
+  font-size: 60px;
+  text-shadow: var(--sub-fullscreen-shadow,
+    -3.5px -3.5px 0 #000,
+     3.5px -3.5px 0 #000,
+    -3.5px  3.5px 0 #000,
+     3.5px  3.5px 0 #000,
+    -3.5px  0px 0 #000,
+     3.5px  0px 0 #000,
+     0px -3.5px 0 #000,
+     0px  3.5px 0 #000,
+    -2.5px -2.5px 0 #000,
+     2.5px -2.5px 0 #000,
+    -2.5px  2.5px 0 #000,
+     2.5px  2.5px 0 #000,
+     0px  0px 6px rgba(0, 0, 0, 0.95));
+}
+
+/* Fullscreen Subtitles - JS body class fallback */
+body.is-video-fullscreen ::cue,
+body.is-video-fullscreen video::cue,
+video.is-video-fullscreen::cue {
+  font-size: 60px;
+  text-shadow: var(--sub-fullscreen-shadow,
+    -3.5px -3.5px 0 #000,
+     3.5px -3.5px 0 #000,
+    -3.5px  3.5px 0 #000,
+     3.5px  3.5px 0 #000,
+    -3.5px  0px 0 #000,
+     3.5px  0px 0 #000,
+     0px -3.5px 0 #000,
+     0px  3.5px 0 #000,
+    -2.5px -2.5px 0 #000,
+     2.5px -2.5px 0 #000,
+    -2.5px  2.5px 0 #000,
+     2.5px  2.5px 0 #000,
+     0px  0px 6px rgba(0, 0, 0, 0.95));
+}
+
+/* WebKit / Chromium text track container bottom clearance */
+video::-webkit-media-text-track-container {
+  bottom: var(--sub-bottom-offset, 8%) !important;
+  overflow: visible !important;
+}
+
+.screen-wrap:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.screen-wrap:fullscreen video {
+  max-width: 100vw;
+  max-height: 100vh;
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
 }
 
 .screen-wrap video:fullscreen {
@@ -482,15 +633,40 @@ label {
 .no-video-placeholder h3 { color: var(--mist); margin-bottom: 10px; font-size: 1.1rem; }
 
 .control-strip {
+  position: relative;
   padding: 18px 24px 26px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   border-top: 1px solid var(--line);
-  flex-wrap: wrap;
+  min-height: 74px;
 }
-.control-strip .left, .control-strip .right, .control-strip .center { display: flex; align-items: center; gap: 12px; }
+.control-strip .left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1;
+}
+.control-strip .center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: auto;
+}
+.control-strip .right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  z-index: 1;
+}
+
 .upload-label {
   display: inline-flex; align-items: center; gap: 8px;
   cursor: pointer;
@@ -510,6 +686,10 @@ label {
   color: var(--mist);
   border: 1px solid var(--line);
 }
+.role-badge.admin {
+  background: var(--amber, #d97757);
+  color: #fff;
+}
 
 .progress-note {
   font-size: 0.8rem;
@@ -527,6 +707,9 @@ label {
   border-radius: var(--radius-md);
   font-size: 0.88rem;
   color: var(--screen);
+  max-width: calc(100vw - 32px);
+  text-align: center;
+  word-break: break-word;
   z-index: 60;
 }
 
@@ -680,6 +863,16 @@ label {
   color: #7fc48a;
   border: 1px solid rgba(90, 166, 107, 0.4);
 }
+.member-badge.host {
+  background: rgba(201, 138, 62, 0.2);
+  color: #e5a758;
+  border: 1px solid rgba(201, 138, 62, 0.4);
+}
+.member-badge.admin {
+  background: rgba(217, 119, 87, 0.25);
+  color: #f39577;
+  border: 1px solid rgba(217, 119, 87, 0.45);
+}
 .member-badge.viewer {
   background: transparent;
   color: var(--mist-faint);
@@ -712,3 +905,474 @@ label {
   color: var(--mist-faint);
   font-size: 0.88rem;
 }
+
+/* ============================================================
+   Crunchyroll-Style Subtitles & Customization Modal
+   ============================================================ */
+
+.sub-settings-btn {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Subtitle modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 14, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  backdrop-filter: blur(4px);
+}
+
+.sub-modal-card {
+  width: 500px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--curtain-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  color: var(--screen);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--screen);
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--mist);
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.modal-close-btn:hover {
+  color: var(--screen);
+}
+
+.sub-preview-container {
+  width: 100%;
+  height: 140px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin: 16px 0;
+  border: 1px solid var(--line);
+  position: relative;
+}
+
+.sub-preview-bg {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background:
+    linear-gradient(rgba(15, 12, 25, 0.35), rgba(15, 12, 25, 0.55)),
+    radial-gradient(circle at 65% 35%, #3d2a52, #130f1c);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px 14px;
+  box-sizing: border-box;
+}
+
+.sub-preview-top-cue {
+  font-family: var(--sub-font-family, 'Trebuchet MS', sans-serif);
+  font-weight: 700;
+  color: var(--sub-color, #ffffff);
+  font-size: calc(15px * var(--sub-scale, 1));
+  text-shadow: var(--sub-text-shadow);
+  -webkit-text-stroke: var(--sub-stroke);
+  paint-order: stroke fill;
+  background: var(--sub-bg, transparent);
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border-radius: 3px;
+  max-width: 90%;
+  text-align: center;
+}
+
+.sub-preview-cue {
+  font-family: var(--sub-font-family, 'Trebuchet MS', sans-serif);
+  font-weight: 700;
+  color: var(--sub-color, #ffffff);
+  font-size: calc(18px * var(--sub-scale, 1));
+  text-shadow: var(--sub-text-shadow);
+  -webkit-text-stroke: var(--sub-stroke);
+  paint-order: stroke fill;
+  background: var(--sub-bg, transparent);
+  position: absolute;
+  bottom: var(--sub-bottom-offset, 8%);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border-radius: 3px;
+  max-width: 90%;
+  text-align: center;
+  transition: bottom 0.15s ease;
+}
+
+.sub-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  margin-top: 10px;
+}
+
+.sub-setting-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.sub-setting-field label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--mist);
+  margin-bottom: 5px;
+}
+
+.sub-input-select {
+  width: 100%;
+  background: var(--ink);
+  color: var(--screen);
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.sub-slider {
+  width: 100%;
+  accent-color: var(--projector);
+}
+
+.color-picker-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-picker-wrap input[type="color"] {
+  width: 34px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 1px;
+  background: var(--ink);
+  cursor: pointer;
+}
+
+.color-val-hex {
+  font-size: 0.8rem;
+  color: var(--mist);
+  font-family: monospace;
+}
+
+#unmute-btn {
+  display: none !important;
+}
+
+/* ============================================================
+   Mobile & Responsive Layout Optimizations
+   Fixes edge overflows, padding on small screens, and mobile tap targets
+   ============================================================ */
+
+.admin-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 14px;
+}
+
+@media (max-width: 768px) {
+  /* Prevent iOS zoom on inputs while keeping styling clean */
+  input[type="text"],
+  input[type="password"],
+  input[type="tel"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .container {
+    padding: 0 14px;
+  }
+
+  /* Topbar (lobby, admin, profiles) */
+  .topbar {
+    padding: 12px 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .topbar .whoami {
+    margin-left: auto;
+    gap: 8px;
+    font-size: 0.84rem;
+  }
+
+  /* Room Stage Header */
+  .stage-header {
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .stage-header .room-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .stage-header .room-title .brand-block {
+    align-items: center;
+    gap: 6px;
+  }
+  .stage-header .room-title .code-chip {
+    font-size: 0.88rem;
+  }
+  .stage-header .header-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* Screen wrap and player */
+  .screen-wrap {
+    padding: 6px 0;
+    min-height: 200px;
+  }
+  .screen-wrap video {
+    max-width: 100%;
+    width: 100%;
+    max-height: 52vh;
+    border-radius: 0;
+  }
+
+  /* Control strip on phones: neatly stacked and perfectly centered */
+  .control-strip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px 18px;
+    min-height: auto;
+    position: static;
+  }
+  .control-strip .left,
+  .control-strip #host-controls,
+  .control-strip #viewer-note {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin: 0;
+  }
+  .control-strip .left > *,
+  .control-strip #host-controls > *,
+  .control-strip #viewer-note > * {
+    margin-left: 0 !important;
+  }
+  .control-strip .center {
+    position: static;
+    transform: none;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin: 2px 0;
+  }
+  .control-strip .right {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-left: 0;
+  }
+  .control-strip button,
+  .control-strip .upload-label {
+    max-width: 100%;
+    text-align: center;
+    justify-content: center;
+    font-size: 0.82rem;
+    padding: 7px 12px;
+  }
+
+  /* Control panel (who can control list) */
+  .control-panel {
+    margin: 0 10px 16px;
+    padding: 12px 10px;
+  }
+  .control-panel-header {
+    margin-bottom: 10px;
+  }
+  .control-panel-header h3 {
+    font-size: 0.95rem;
+  }
+  .control-panel-hint {
+    font-size: 0.74rem;
+    line-height: 1.35;
+  }
+  .member-row {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .member-name {
+    flex: 1 1 calc(100% - 46px);
+    min-width: 0;
+  }
+  .member-actions {
+    width: 100%;
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .member-actions .btn-tiny {
+    flex: 1;
+    text-align: center;
+    padding: 6px 8px;
+    font-size: 0.76rem;
+  }
+
+  /* Subtitle Customization Modal */
+  .modal-backdrop {
+    padding: 10px;
+  }
+  .sub-modal-card {
+    width: 100%;
+    max-width: calc(100vw - 16px);
+    max-height: 88vh;
+    padding: 16px 14px;
+  }
+  .sub-settings-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .sub-preview-container {
+    height: 100px;
+    margin: 10px 0;
+  }
+  .sub-preview-cue {
+    font-size: calc(15px * var(--sub-scale, 1));
+  }
+  .sub-preview-top-cue {
+    font-size: calc(12px * var(--sub-scale, 1));
+  }
+  .modal-footer {
+    display: flex;
+    gap: 10px;
+  }
+  .modal-footer button {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* Lobby & Panels */
+  .lobby-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 16px 0 60px;
+  }
+  .panel {
+    padding: 18px 14px;
+  }
+  .room-list-item {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .room-list-item .stub {
+    flex: 1 1 100%;
+    margin-left: 0;
+    padding-left: 10px;
+  }
+  .room-list-item > div:last-child {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* Profile Picker */
+  .picker-stage {
+    padding: 24px 14px;
+  }
+  .picker-stage h1 {
+    font-size: 1.7rem;
+    margin-bottom: 20px;
+  }
+  .profile-grid {
+    gap: 14px 16px;
+  }
+  .profile-tile .avatar {
+    width: 72px;
+    height: 72px;
+    font-size: 1.7rem;
+  }
+  .pin-modal {
+    width: 100%;
+    max-width: calc(100vw - 24px);
+    padding: 22px 18px;
+  }
+
+  /* Admin forms & tables */
+  .new-profile-form {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .new-profile-form .field {
+    width: 100%;
+    max-width: none !important;
+    min-width: 0;
+  }
+  .new-profile-form button {
+    width: 100%;
+    margin-top: 4px;
+  }
+  .admin-table th,
+  .admin-table td {
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 768px) and (orientation: landscape) {
+  .screen-wrap video {
+    max-height: 80vh;
+    width: auto;
+  }
+}
+
+

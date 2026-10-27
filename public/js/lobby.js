@@ -6,7 +6,7 @@ async function init() {
   if (!me) return;
   renderWhoami(me, 'whoami');
 
-  if (!me.canHost) {
+  if (!me.canHost && !me.isAdmin) {
     document.getElementById('host-panel').innerHTML = `
       <h2>Start a screening</h2>
       <p class="section-sub">Hosting isn't enabled for this profile.</p>
@@ -34,7 +34,7 @@ async function refreshRoomList() {
           <div class="r-meta">Hosted by ${escapeHtml(r.hostName)} · ${r.status === 'active' ? 'playing' : 'waiting for video'}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-          ${r.hostId === me.id ? `<button class="btn-ghost btn-tiny" data-code="${r.code}" data-toggle-private>${r.isPrivate ? 'Make public' : 'Make private'}</button>` : ''}
+          ${(r.hostId === me.id || me.isAdmin) ? `<button class="btn-ghost btn-tiny" data-code="${r.code}" data-toggle-private>${r.isPrivate ? 'Make public' : 'Make private'}</button>` : ''}
           <button class="btn-ghost btn-small" data-code="${r.code}">Join</button>
         </div>
       </div>`
