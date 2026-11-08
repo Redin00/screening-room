@@ -33,7 +33,7 @@ router.get('/profiles', (req, res) => {
 
 router.post('/profiles', (req, res) => {
   const { displayName, pin, canHost, isAdmin } = req.body || {};
-  const name = String(displayName || '').trim();
+  const name = String(displayName || '').trim().slice(0, 40);
   if (!name) return res.status(400).json({ error: 'Display name is required.' });
   if (pin && !/^\d{4,8}$/.test(String(pin))) {
     return res.status(400).json({ error: 'PIN must be 4–8 digits, or left blank.' });
@@ -84,7 +84,7 @@ router.patch('/profiles/:id', (req, res) => {
   }
   if (typeof displayName === 'string' && displayName.trim()) {
     updates.push('display_name = ?');
-    params.push(displayName.trim());
+    params.push(displayName.trim().slice(0, 40));
   }
   if (clearPin) {
     updates.push('pin_hash = ?');

@@ -13,9 +13,28 @@ const subtitles = require('../subtitles');
 const router = express.Router();
 router.use(requireAuth);
 
+function isSafeUploadPath(targetPath) {
+  if (!targetPath || typeof targetPath !== 'string') return false;
+  const resolvedUploads = path.resolve(config.uploadsDir) + path.sep;
+  const resolvedTarget = path.resolve(targetPath);
+  return resolvedTarget.startsWith(resolvedUploads);
+}
+
 function roomPublic(row) {
   let subs = null;
-  try { subs = row.subtitles ? JSON.parse(row.subtitles) : null; } catch (_) { subs = null; }
+  try {
+    const parsed = row.subtitles ? JSON.parse(row.subtitles) : null;
+    if (Array.isArray(parsed)) {
+      subs = parsed.map((t) => ({
+        index: t.index,
+        subIndex: t.subIndex,
+        srclang: t.srclang || '',
+        label: t.label,
+      }));
+    }
+  } catch (_) {
+    subs = null;
+  }
   return {
     code: row.code,
     name: row.name,
@@ -31,13 +50,18 @@ function roomPublic(row) {
 }
 
 function loadRoom(req, res, next) {
+  const code = String(req.params.code || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,12}$/.test(code)) {
+    return res.status(400).json({ error: 'Invalid room code.' });
+  }
+  req.params.code = code;
   const room = db
     .prepare(
       `SELECT rooms.*, profiles.display_name AS host_name
        FROM rooms JOIN profiles ON profiles.id = rooms.host_id
        WHERE rooms.code = ?`
     )
-    .get(req.params.code);
+    .get(code);
   if (!room) return res.status(404).json({ error: 'Room not found. It may have ended.' });
   req.room = room;
   next();
@@ -81,7 +105,8 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', requireHostPermission, (req, res) => {
-  const name = String((req.body && req.body.name) || '').trim() || `${req.profile.display_name}'s room`;
+  const rawName = String((req.body && req.body.name) || '').trim().slice(0, 80);
+  const name = rawName || `${req.profile.display_name}'s room`;
   const isPrivate = !!(req.body && req.body.private);
   let code;
   do {
@@ -172,22 +197,25 @@ router.patch('/:code/private', loadRoom, requireIsHost, (req, res) => {
 // moved directories, cross-system DB migrations, or relative locations.
 function resolveVideoPath(room) {
   if (!room) return null;
-  if (room.video_path && fs.existsSync(room.video_path)) {
+  if (room.video_path && isSafeUploadPath(room.video_path) && fs.existsSync(room.video_path)) {
     return room.video_path;
   }
   const dir = scheduler.roomDir(room.id);
   if (room.video_path) {
     const candidate = path.join(dir, path.basename(room.video_path));
-    if (fs.existsSync(candidate)) return candidate;
+    if (isSafeUploadPath(candidate) && fs.existsSync(candidate)) return candidate;
   }
-  if (fs.existsSync(dir)) {
+  if (isSafeUploadPath(dir) && fs.existsSync(dir)) {
     try {
       const files = fs.readdirSync(dir);
       const videoFile = files.find((f) => {
         const ext = path.extname(f).toLowerCase();
         return config.allowedExtensions.includes(ext);
       });
-      if (videoFile) return path.join(dir, videoFile);
+      if (videoFile) {
+        const resolved = path.join(dir, path.basename(videoFile));
+        if (isSafeUploadPath(resolved)) return resolved;
+      }
     } catch (_) {}
   }
   return null;
@@ -312,17 +340,20 @@ router.get('/:code/subtitles/:index.vtt', loadRoom, (req, res) => {
     if (videoPath) candidates.push(path.join(path.dirname(videoPath), `${videoBase}.s${track.index}.vtt`));
   }
 
-  let finalVttPath = candidates.find((p) => p && fs.existsSync(p) && fs.statSync(p).size > 10);
+  let finalVttPath = candidates.find(
+    (p) => p && isSafeUploadPath(p) && path.extname(p).toLowerCase() === '.vtt' && fs.existsSync(p) && fs.statSync(p).size > 10
+  );
 
   // If still missing on disk, dynamically extract this specific track on demand!
   if (!finalVttPath && videoPath && fs.existsSync(videoPath)) {
     try {
-      finalVttPath = subtitles.extractSubtitleToVtt(
+      const extracted = subtitles.extractSubtitleToVtt(
         videoPath,
         track.subIndex != null ? track.subIndex : 0,
         dir,
         track.codec
       );
+      if (isSafeUploadPath(extracted)) finalVttPath = extracted;
     } catch (err) {
       console.error(`On-the-fly subtitle extraction failed for stream ${track.index}:`, err.message);
     }

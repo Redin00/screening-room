@@ -1,14 +1,23 @@
 require('dotenv').config();
 const path = require('path');
+const crypto = require('crypto');
 
 function int(value, fallback) {
   const n = parseInt(value, 10);
   return Number.isFinite(n) ? n : fallback;
 }
 
+let sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret || sessionSecret === 'dev-secret-change-me') {
+  sessionSecret = crypto.randomBytes(32).toString('hex');
+  console.warn(
+    '[Security] SESSION_SECRET is not set or uses default placeholder; generated a random secret for this process. Set a strong SESSION_SECRET in .env to persist sessions across restarts.'
+  );
+}
+
 module.exports = {
   port: int(process.env.PORT, 3000),
-  sessionSecret: process.env.SESSION_SECRET || 'dev-secret-change-me',
+  sessionSecret,
   deleteDelayMinutes: int(process.env.DELETE_DELAY_MINUTES, 10),
   cleanupSweepMinutes: int(process.env.CLEANUP_SWEEP_MINUTES, 2),
   orphanRoomMinutes: int(process.env.ORPHAN_ROOM_MINUTES, 10),

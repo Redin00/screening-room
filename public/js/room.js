@@ -543,7 +543,7 @@ function renderMembers(memberList) {
     const row = document.createElement('div');
     row.className = 'member-row';
     row.innerHTML = `
-      <div class="member-avatar" style="background:${m.avatarColor || '#888'}">${ initials(m.displayName) }</div>
+      <div class="member-avatar" style="background:${typeof sanitizeColor === 'function' ? sanitizeColor(m.avatarColor) : '#888'}">${ initials(m.displayName) }</div>
       <div class="member-name">
         <span class="member-display">${escapeHtml(m.displayName)}${isMe ? ' (you)' : ''}</span>
         <div class="member-perms">

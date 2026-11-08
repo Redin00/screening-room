@@ -17,15 +17,36 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+// Security headers against common web vulnerabilities (XSS, Clickjacking, MIME sniffing)
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  );
+  next();
+});
+
 const sessionMiddleware = session({
   secret: config.sessionSecret,
   name: 'screening.sid',
   resave: false,
   saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: 'lax', maxAge: 1000 * 60 * 60 * 24 * 30 },
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production' ? 'auto' : false,
+    maxAge: 1000 * 60 * 60 * 24 * 30,
+  },
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 app.use(sessionMiddleware);
 app.use(loadProfile);
 

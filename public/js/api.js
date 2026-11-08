@@ -15,8 +15,23 @@ async function api(method, url, body) {
   return data;
 }
 
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[c]));
+}
+
+function sanitizeColor(color) {
+  const s = String(color || '').trim();
+  return /^#[0-9a-fA-F]{3,8}$/.test(s) ? s : '#888888';
+}
+
 function initials(name) {
-  return (name || '?').trim().charAt(0).toUpperCase();
+  return escapeHtml((name || '?').trim().charAt(0).toUpperCase());
 }
 
 async function requireProfile() {
@@ -32,8 +47,8 @@ function renderWhoami(profile, containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = `
-    <div class="avatar-sm" style="background:${profile.avatarColor}">${initials(profile.displayName)}</div>
-    <span>${profile.displayName}</span>
+    <div class="avatar-sm" style="background:${sanitizeColor(profile.avatarColor)}">${initials(profile.displayName)}</div>
+    <span>${escapeHtml(profile.displayName)}</span>
     ${profile.isAdmin ? '<a href="/admin.html" class="btn-ghost btn-small" style="text-decoration:none;display:inline-block;">Admin</a>' : ''}
     <button class="btn-ghost btn-small" id="logout-btn" type="button">Switch profile</button>
   `;

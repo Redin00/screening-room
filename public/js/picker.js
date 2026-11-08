@@ -21,9 +21,9 @@ async function init() {
   grid.innerHTML = profiles
     .map(
       (p) => `
-      <button class="profile-tile" data-id="${p.id}" type="button">
-        <div class="avatar" style="background:${p.avatarColor}">${initials(p.displayName)}</div>
-        <div class="name">${p.displayName}</div>
+      <button class="profile-tile" data-id="${Number(p.id) || 0}" type="button">
+        <div class="avatar" style="background:${sanitizeColor(p.avatarColor)}">${initials(p.displayName)}</div>
+        <div class="name">${escapeHtml(p.displayName)}</div>
         ${p.hasPin ? '<div class="lock">PIN required</div>' : ''}
       </button>`
     )

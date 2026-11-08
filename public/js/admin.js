@@ -43,7 +43,7 @@ function rowHtml(p) {
     <tr>
       <td>
         <div class="name-cell">
-          <div class="avatar-sm" style="background:${p.avatarColor}">${initials(p.displayName)}</div>
+          <div class="avatar-sm" style="background:${sanitizeColor(p.avatarColor)}">${initials(p.displayName)}</div>
           <span>${escapeHtml(p.displayName)}${isSelf ? ' (you)' : ''}</span>
         </div>
       </td>
