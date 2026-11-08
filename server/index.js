@@ -68,7 +68,8 @@ app.get('*', (req, res, next) => {
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: 'Something went wrong on the server.' });
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({ error: status < 500 ? (err.message || 'Bad request.') : 'Something went wrong on the server.' });
 });
 
 roomSocket.attach(io);
